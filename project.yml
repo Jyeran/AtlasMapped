@@ -23,6 +23,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atlasmapped.ios
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Atlas/Info-iOS.plist
         CODE_SIGN_ENTITLEMENTS: Atlas/Atlas-iOS.entitlements
         CODE_SIGN_STYLE: Automatic
         UBIQUITY_KVSTORE_IDENTIFIER: $(TeamIdentifierPrefix)com.atlasmapped.ios

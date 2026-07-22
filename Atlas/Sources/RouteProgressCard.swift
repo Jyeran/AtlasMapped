@@ -36,7 +36,8 @@ struct RouteProgressCard: View {
             .accessibilityLabel("Show route and waypoint details")
         }
         .overlay(alignment: .topTrailing) {
-            HStack(spacing: 4) {
+            if !state.hasActiveHike {
+                HStack(spacing: 4) {
                 routeHistoryButton(
                     systemImage: "arrow.uturn.backward",
                     label: "Undo route edit",
@@ -58,8 +59,9 @@ struct RouteProgressCard: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Clear active route")
+                }
+                .padding(8)
             }
-            .padding(8)
         }
         .onChange(of: state.currentRouteName) { _, _ in
             didSave = false
@@ -196,13 +198,65 @@ struct RouteProgressCard: View {
         .accessibilityHint("Replaces the drawn route with a matching continuous mapped trail")
     }
 
-    private var trackingMetrics: some View {
-        HStack(spacing: 10) {
-            metric("Elevation", value: elevationLabel)
-            metric("Progress", value: state.routeProgress.formatted(.percent.precision(.fractionLength(0))))
-            metric("Distance from route", value: distanceFromRouteLabel)
-            endButton
+    private var trackingPanel: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 14) {
+                metric("Traveled", value: HikeFormatting.distance(state.trackingDistanceMeters))
+                metric("Active", value: HikeFormatting.duration(state.trackingActiveDuration))
+                metric("Elapsed", value: HikeFormatting.duration(state.trackingElapsedDuration))
+                metric("Pace", value: HikeFormatting.pace(state.trackingPaceSecondsPerMile))
+            }
+            if state.hikeRecorder.mode == .plannedRoute {
+                HStack(spacing: 14) {
+                    metric("Next", value: state.trackingNextWaypointName ?? "Finish")
+                    metric("To next", value: state.trackingNextWaypointRemainingMeters.map(HikeFormatting.distance) ?? "—")
+                    metric("Remaining", value: state.trackingRemainingMeters.map(HikeFormatting.distance) ?? "—")
+                    metric("ETA", value: state.trackingETA?.formatted(date: .omitted, time: .shortened) ?? "—")
+                }
+                HStack(spacing: 14) {
+                    metric("Progress", value: state.routeProgress.formatted(.percent.precision(.fractionLength(0))))
+                    metric("Off route", value: distanceFromRouteLabel)
+                    metric("Elevation", value: elevationLabel)
+                }
+            } else {
+                HStack(spacing: 14) {
+                    metric("Elevation gain", value: HikeFormatting.elevation(state.trackingElevationGainMeters))
+                    metric("Splits", value: "\(state.hikeRecorder.splits.filter { $0.kind == .manual }.count)")
+                }
+            }
+            HStack(spacing: 9) {
+                pauseResumeButton
+                if state.hikeRecorder.mode == .freeRecording { splitButton }
+                endButton
+            }
         }
+    }
+
+    private var pauseResumeButton: some View {
+        Button {
+            state.isTrackingPaused ? state.resumeHikeTracking() : state.pauseHikeTracking()
+        } label: {
+            Label(state.isTrackingPaused ? "Resume" : "Pause", systemImage: state.isTrackingPaused ? "play.fill" : "pause.fill")
+                .font(.subheadline.weight(.bold))
+                .frame(minWidth: 82, minHeight: 42)
+                .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(AtlasTheme.forest)
+        .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    }
+
+    private var splitButton: some View {
+        Button { state.addTrackingSplit() } label: {
+            Label("Split", systemImage: "flag.fill")
+                .font(.subheadline.weight(.bold))
+                .frame(minWidth: 72, minHeight: 42)
+                .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(AtlasTheme.forest)
+        .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .disabled(state.hikeRecorder.samples.isEmpty || state.isTrackingPaused)
     }
 
     private var endButton: some View {
@@ -237,12 +291,12 @@ struct RouteProgressCard: View {
     private var wideLayout: some View {
         HStack(spacing: 20) {
             routeSummary
-            elevationProfile
-            fitButton
-            saveButton
+            if state.hikeRecorder.mode != .freeRecording { elevationProfile }
             if state.isTracking {
-                trackingMetrics
+                trackingPanel
             } else {
+                fitButton
+                saveButton
                 startButton
             }
         }
@@ -251,14 +305,10 @@ struct RouteProgressCard: View {
     private var compactLayout: some View {
         VStack(alignment: .leading, spacing: 12) {
             routeSummary
-            elevationProfile
+            if state.hikeRecorder.mode != .freeRecording { elevationProfile }
             if state.isTracking {
-                trackingMetrics
+                trackingPanel
                     .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 10) {
-                    fitButton
-                    saveButton
-                }
             } else {
                 HStack(spacing: 10) {
                     fitButton

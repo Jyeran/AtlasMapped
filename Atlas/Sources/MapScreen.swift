@@ -76,7 +76,7 @@ struct MapScreen: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
 
-                    if state.hasActiveRoute {
+                    if state.hasActiveRoute || state.hasActiveHike {
                         RouteProgressCard { showRouteDetails = true }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 12)
@@ -144,6 +144,14 @@ struct MapScreen: View {
             }
 
             Menu {
+                if !state.hasActiveHike {
+                    Button { state.startFreeRecording() } label: {
+                        Label("Start recording", systemImage: "record.circle")
+                    }
+                }
+                Button { state.showHikeHistory = true } label: {
+                    Label("Hike history", systemImage: "clock.arrow.circlepath")
+                }
                 Button { state.showLayers.toggle() } label: {
                     Label("Map layers", systemImage: "square.3.layers.3d")
                 }

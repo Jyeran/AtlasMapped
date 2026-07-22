@@ -105,6 +105,8 @@ final class AppState: ObservableObject {
     @Published var routeWaypointIndices: Set<Int> = []
     @Published var namedRouteWaypoints: [NamedRouteWaypoint] = []
     @Published var isTracking = false
+    @Published var showHikeHistory = false
+    @Published var completedHike: RecordedHike?
     @Published var showLayers = false
     @Published var showOfflineMaps = false
     @Published var isSelectingOfflineArea = false
@@ -132,6 +134,8 @@ final class AppState: ObservableObject {
     let connectivity = ConnectivityMonitor()
     let offline = OfflineRegionManager()
     let routes = RouteLibrary()
+    let hikeRecorder = HikeRecorder()
+    let hikes = HikeLibrary()
     private let elevationService = ElevationService()
     private var subscriptions: Set<AnyCancellable> = []
     private var elevationTask: Task<Void, Never>?
@@ -162,6 +166,12 @@ final class AppState: ObservableObject {
         routes.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
+        hikeRecorder.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
+        hikes.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
         location.onLocationUpdate = { [weak self] newLocation in
             guard let self else { return }
             if self.shouldFocusFirstLocation {
@@ -172,7 +182,15 @@ final class AppState: ObservableObject {
                 ))
             }
             if self.isTracking {
-                self.updateTrackingPosition(newLocation)
+                let priorSampleCount = self.hikeRecorder.samples.count
+                self.hikeRecorder.ingest(newLocation)
+                if self.hikeRecorder.mode == .freeRecording,
+                   self.hikeRecorder.samples.count > priorSampleCount {
+                    self.appendRecordedRoutePoint(newLocation.coordinate)
+                }
+                if !self.hikeRecorder.isPaused {
+                    self.updateTrackingPosition(newLocation)
+                }
             }
         }
     }
@@ -208,6 +226,30 @@ final class AppState: ObservableObject {
     }
 
     var hasActiveRoute: Bool { routePoints.count > 1 }
+    var hasActiveHike: Bool { hikeRecorder.isActive }
+    var isTrackingPaused: Bool { hikeRecorder.isPaused }
+    var trackingDistanceMeters: Double { hikeRecorder.distanceMeters }
+    var trackingElapsedDuration: TimeInterval { hikeRecorder.elapsedDuration }
+    var trackingActiveDuration: TimeInterval { hikeRecorder.activeDuration }
+    var trackingPaceSecondsPerMile: Double? { hikeRecorder.paceSecondsPerMile }
+    var trackingElevationGainMeters: Double { hikeRecorder.elevationGainMeters }
+    var trackingRemainingMeters: Double? {
+        guard hikeRecorder.mode == .plannedRoute else { return nil }
+        return max(0, routeDistance * (1 - routeProgress))
+    }
+    var trackingETA: Date? {
+        guard let remaining = trackingRemainingMeters,
+              let pace = trackingPaceSecondsPerMile else { return nil }
+        return hikeRecorder.now.addingTimeInterval((remaining / 1_609.344) * pace)
+    }
+    var trackingNextWaypointName: String? { hikeRecorder.nextWaypoint?.name }
+    var trackingNextWaypointRemainingMeters: Double? {
+        guard let next = hikeRecorder.nextWaypoint,
+              routePoints.indices.contains(next.routePointIndex) else { return nil }
+        let cumulative = RouteMath.cumulativeDistances(along: routePoints)
+        let routePosition = routeDistance * routeProgress
+        return max(0, cumulative[next.routePointIndex] - routePosition)
+    }
 
     var routeElevationProfile: [Double] {
         guard currentElevationProfileProvider == ElevationService.providerID,
@@ -371,7 +413,7 @@ final class AppState: ObservableObject {
         let previous = routePoints[routePointIndex]
         guard previous.latitude != coordinate.latitude || previous.longitude != coordinate.longitude else { return }
 
-        endRouteTracking()
+        cancelActiveHike()
         recordRouteEdit()
         routePoints[routePointIndex] = coordinate
         routeGeometryDidChange()
@@ -429,7 +471,7 @@ final class AppState: ObservableObject {
     }
 
     private func prepareRouteForEditing() {
-        endRouteTracking()
+        cancelActiveHike()
         if routePoints.isEmpty {
             currentRouteID = UUID()
             currentRouteCreatedAt = .now
@@ -518,6 +560,7 @@ final class AppState: ObservableObject {
     }
 
     func loadRoute(_ plan: RoutePlan) {
+        cancelActiveHike()
         routeFitTask?.cancel()
         isFittingRoute = false
         resetRouteEditHistory()
@@ -539,7 +582,6 @@ final class AppState: ObservableObject {
         selectedPinID = nil
         routeProgress = 0
         distanceFromRouteMeters = nil
-        isTracking = false
         selectedTool = .explore
         routeRevision = UUID()
         focusMap(on: plan.coordinates)
@@ -554,7 +596,7 @@ final class AppState: ObservableObject {
         guard coordinates.count > 1 else { return }
         resetRouteEditHistory()
         isRouteFitted = false
-        endRouteTracking()
+        cancelActiveHike()
         elevationTask?.cancel()
         currentRouteID = UUID()
         currentRouteCreatedAt = .now
@@ -717,18 +759,107 @@ final class AppState: ObservableObject {
 
     func startRouteTracking() {
         guard hasActiveRoute else { return }
+        guard !hikeRecorder.isActive else {
+            if hikeRecorder.isPaused { resumeHikeTracking() }
+            return
+        }
+        hikeRecorder.startPlanned(route: currentRoutePlan())
         isTracking = true
-        location.requestAccessAndStart()
-        if let location = location.location { updateTrackingPosition(location) }
+        location.beginHikeTracking()
+        if let location = location.location {
+            hikeRecorder.ingest(location)
+            updateTrackingPosition(location)
+        }
+    }
+
+    func startFreeRecording() {
+        guard !hikeRecorder.isActive else { return }
+        routeFitTask?.cancel()
+        elevationTask?.cancel()
+        resetRouteEditHistory()
+        routePoints.removeAll()
+        routeWaypointIndices.removeAll()
+        namedRouteWaypoints.removeAll()
+        pins.removeAll()
+        currentRouteID = UUID()
+        currentRouteCreatedAt = .now
+        currentRouteName = "Recorded Hike"
+        currentRouteElevationProfileMeters = nil
+        currentElevationProfileProvider = nil
+        routeProgress = 0
+        distanceFromRouteMeters = nil
+        selectedTool = .explore
+        hikeRecorder.startFreeRecording()
+        isTracking = true
+        location.beginHikeTracking()
+        if let current = location.location {
+            hikeRecorder.ingest(current)
+            appendRecordedRoutePoint(current.coordinate)
+        }
+    }
+
+    func pauseHikeTracking() {
+        guard hikeRecorder.isActive, !hikeRecorder.isPaused else { return }
+        hikeRecorder.pause()
+    }
+
+    func resumeHikeTracking() {
+        guard hikeRecorder.isPaused else { return }
+        hikeRecorder.resume()
+    }
+
+    func addTrackingSplit() {
+        guard let split = hikeRecorder.addManualSplit(),
+              let coordinate = split.coordinate?.coordinate else { return }
+        if hikeRecorder.mode == .freeRecording {
+            if routePoints.isEmpty { routePoints.append(coordinate) }
+            let index = max(0, routePoints.count - 1)
+            routeWaypointIndices.insert(index)
+            namedRouteWaypoints.append(NamedRouteWaypoint(
+                routePointIndex: index,
+                name: split.name,
+                kind: .standard
+            ))
+        }
     }
 
     func endRouteTracking() {
+        guard hikeRecorder.isActive else {
+            isTracking = false
+            distanceFromRouteMeters = nil
+            return
+        }
+        let recordedPlan: RoutePlan
+        if hikeRecorder.mode == .freeRecording {
+            if let lastIndex = routePoints.indices.last,
+               !routeWaypointIndices.contains(lastIndex) {
+                routeWaypointIndices.insert(lastIndex)
+                namedRouteWaypoints.append(NamedRouteWaypoint(routePointIndex: lastIndex, name: "Finish"))
+            }
+            normalizeCurrentRouteName()
+            recordedPlan = currentRoutePlan()
+            if recordedPlan.coordinates.count > 1 { routes.save(recordedPlan) }
+        } else {
+            recordedPlan = currentRoutePlan()
+        }
+        if let hike = hikeRecorder.finish(recordedRoute: recordedPlan) {
+            hikes.save(hike)
+            completedHike = hike
+        }
+        location.endHikeTracking()
+        isTracking = false
+        distanceFromRouteMeters = nil
+    }
+
+    func cancelActiveHike() {
+        hikeRecorder.cancel()
+        location.endHikeTracking()
         isTracking = false
         distanceFromRouteMeters = nil
     }
 
     func clearActiveRoute() {
-        endRouteTracking()
+        cancelActiveHike()
         routeFitTask?.cancel()
         isFittingRoute = false
         resetRouteEditHistory()
@@ -753,9 +884,23 @@ final class AppState: ObservableObject {
     }
 
     private func updateTrackingPosition(_ location: CLLocation) {
-        guard let position = RouteMath.position(location: location.coordinate, along: routePoints) else { return }
-        routeProgress = position.progress
+        guard hikeRecorder.mode == .plannedRoute,
+              let position = RouteMath.position(location: location.coordinate, along: routePoints) else {
+            distanceFromRouteMeters = nil
+            return
+        }
+        routeProgress = max(routeProgress, position.progress)
         distanceFromRouteMeters = position.distanceFromRoute
+    }
+
+    private func appendRecordedRoutePoint(_ coordinate: CLLocationCoordinate2D) {
+        if routePoints.isEmpty {
+            routePoints.append(coordinate)
+            routeWaypointIndices.insert(0)
+            namedRouteWaypoints.append(NamedRouteWaypoint(routePointIndex: 0, name: "Start"))
+        } else {
+            routePoints.append(coordinate)
+        }
     }
 
     func setWaypointName(id: UUID, name: String) {

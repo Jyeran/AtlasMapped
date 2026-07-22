@@ -24,6 +24,28 @@ final class LocationService: NSObject, ObservableObject {
         if CLLocationManager.headingAvailable() { manager.startUpdatingHeading() }
     }
 
+    func beginHikeTracking() {
+        manager.activityType = .fitness
+        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        manager.distanceFilter = 3
+        #if os(iOS)
+        manager.pausesLocationUpdatesAutomatically = false
+        manager.allowsBackgroundLocationUpdates = true
+        manager.showsBackgroundLocationIndicator = true
+        #endif
+        requestAccessAndStart()
+    }
+
+    func endHikeTracking() {
+        manager.activityType = .other
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.distanceFilter = 3
+        #if os(iOS)
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
+        #endif
+    }
+
 }
 
 extension LocationService: @preconcurrency CLLocationManagerDelegate {

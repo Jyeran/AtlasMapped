@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000001 /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* HikeActivity.swift */; };
+		A10000000000000000000002 /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* HikeActivity.swift */; };
+		A10000000000000000000003 /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* HikeHistoryView.swift */; };
+		A10000000000000000000004 /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* HikeHistoryView.swift */; };
 		06CAA734FC54F4DF7CD24E54 /* RouteLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D92253004C0815D9D54AD8B /* RouteLibrary.swift */; };
 		090BB4FA33C8616A796A7559 /* AtlasMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */; };
 		0A69909F6A143EC327AC88CD /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A655E3CAEE8F48C9C9647DA /* RootView.swift */; };
@@ -62,6 +66,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C10000000000000000000001 /* HikeActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeActivity.swift; sourceTree = "<group>"; };
+		C10000000000000000000002 /* HikeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeHistoryView.swift; sourceTree = "<group>"; };
 		030381F022678CD162270362 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasMapView.swift; sourceTree = "<group>"; };
 		1A655E3CAEE8F48C9C9647DA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -114,6 +120,8 @@
 			isa = PBXGroup;
 			children = (
 				C210CD508E9A5A2A1CB0F1AE /* AppState.swift */,
+				C10000000000000000000001 /* HikeActivity.swift */,
+				C10000000000000000000002 /* HikeHistoryView.swift */,
 				7DC4ED83F26A196EB5EB320A /* AtlasMappedApp.swift */,
 				1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */,
 				A754455F4BB84916072016D6 /* CachedTileOverlay.swift */,
@@ -253,6 +261,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F74738647DFA1D6A1408F67C /* AppState.swift in Sources */,
+				A10000000000000000000001 /* HikeActivity.swift in Sources */,
+				A10000000000000000000003 /* HikeHistoryView.swift in Sources */,
 				45E9A7A11C0DFFBFC6C2A57F /* AtlasMapView.swift in Sources */,
 				1D203960DC2CF1E604FF4250 /* AtlasMappedApp.swift in Sources */,
 				DA872EFDFD0D9856F8CB7405 /* CachedTileOverlay.swift in Sources */,
@@ -285,6 +295,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				1515AAC0E7531B1A8C5AF25B /* AppState.swift in Sources */,
+				A10000000000000000000002 /* HikeActivity.swift in Sources */,
+				A10000000000000000000004 /* HikeHistoryView.swift in Sources */,
 				090BB4FA33C8616A796A7559 /* AtlasMapView.swift in Sources */,
 				9505834C0CB43D71FA38C80D /* AtlasMappedApp.swift in Sources */,
 				7D990E1D5C4C6F4C6B1389EF /* CachedTileOverlay.swift in Sources */,
@@ -323,6 +335,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3GZG2C29FM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Atlas/Info-iOS.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -445,6 +459,8 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 3GZG2C29FM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Atlas/Info-iOS.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

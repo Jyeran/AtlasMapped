@@ -42,6 +42,22 @@ struct RootView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $state.showHikeHistory) {
+            HikeHistoryView()
+                .environmentObject(state)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $state.completedHike) { hike in
+            NavigationStack {
+                HikeSummaryView(hike: hike)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { state.completedHike = nil }
+                        }
+                    }
+            }
+        }
         .task { state.location.requestAccessAndStart() }
     }
 }
@@ -79,6 +95,20 @@ struct SidebarView: View {
 
             Button { state.showRouteTransfer = true } label: {
                 Label("Route plans", systemImage: "map.fill")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(SidebarButtonStyle())
+
+            if !state.hasActiveHike {
+                Button { state.startFreeRecording() } label: {
+                    Label("Start recording", systemImage: "record.circle")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(SidebarButtonStyle())
+            }
+
+            Button { state.showHikeHistory = true } label: {
+                Label("Hike history", systemImage: "clock.arrow.circlepath")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(SidebarButtonStyle())
