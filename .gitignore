@@ -1,0 +1,14 @@
+.DS_Store
+.bin/
+.build/
+Build/
+DerivedData/
+.derivedData/
+.tools/
+.vendor/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.mobileprovision
+*.p12
+*.atlasroute
