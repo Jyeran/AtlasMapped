@@ -38,6 +38,7 @@ struct AtlasMapView {
         )
         context.coordinator.updateSelectionMode(on: map)
         context.coordinator.updateContent(on: map)
+        context.coordinator.updateHeadingIndicator(on: map)
 
         if let command, command != context.coordinator.lastCommand {
             context.coordinator.lastCommand = command
@@ -80,6 +81,7 @@ struct AtlasMapView {
         private var hasObservedInitialRegion = false
         private var lassoCoordinates: [CLLocationCoordinate2D] = []
         private var lastDrawingStrokePoint: CGPoint?
+        private var headingConeAnnotation: HeadingConeAnnotation?
         #if os(iOS)
         private weak var lassoGesture: UIPanGestureRecognizer?
         private weak var routeDrawGesture: UILongPressGestureRecognizer?
@@ -162,6 +164,30 @@ struct AtlasMapView {
             syncUserAnnotations(on: map)
         }
 
+        func updateHeadingIndicator(on map: MKMapView) {
+            guard let location = owner.state.location.location else {
+                if let headingConeAnnotation {
+                    map.removeAnnotation(headingConeAnnotation)
+                    self.headingConeAnnotation = nil
+                }
+                return
+            }
+
+            let annotation: HeadingConeAnnotation
+            if let existing = headingConeAnnotation {
+                annotation = existing
+                annotation.coordinate = location.coordinate
+            } else {
+                annotation = HeadingConeAnnotation(coordinate: location.coordinate)
+                headingConeAnnotation = annotation
+                map.addAnnotation(annotation)
+            }
+            annotation.headingDegrees = owner.state.location.headingDegrees
+            if let view = map.view(for: annotation) as? HeadingConeView {
+                view.setHeading(annotation.headingDegrees)
+            }
+        }
+
         private func syncUserAnnotations(on map: MKMapView) {
             let routedPinIDs = Set(owner.state.namedRouteWaypoints.compactMap { waypoint -> UUID? in
                 guard waypoint.resolvedKind == .pin,
@@ -234,6 +260,14 @@ struct AtlasMapView {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let headingCone = annotation as? HeadingConeAnnotation {
+                let reuseIdentifier = "atlas-heading-cone"
+                let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? HeadingConeView)
+                    ?? HeadingConeView(annotation: headingCone, reuseIdentifier: reuseIdentifier)
+                view.annotation = headingCone
+                view.setHeading(headingCone.headingDegrees)
+                return view
+            }
             if let contour = annotation as? ContourLabelAnnotation {
                 let reuseIdentifier = "atlas-contour-label"
                 let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? ContourLabelView)
@@ -886,6 +920,41 @@ extension UIImage {
     static func atlasSymbol(named name: String) -> UIImage? { UIImage(systemName: name) }
 }
 
+final class HeadingConeView: MKAnnotationView {
+    private let coneLayer = CAShapeLayer()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        bounds = CGRect(x: 0, y: 0, width: 72, height: 72)
+        backgroundColor = .clear
+        isEnabled = false
+        canShowCallout = false
+        displayPriority = .required
+        layer.zPosition = -100
+
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 36, y: 36))
+        path.addLine(to: CGPoint(x: 23, y: 8))
+        path.addQuadCurve(to: CGPoint(x: 49, y: 8), control: CGPoint(x: 36, y: 1))
+        path.closeSubpath()
+        coneLayer.frame = bounds
+        coneLayer.path = path
+        coneLayer.fillColor = UIColor(red: 0.05, green: 0.48, blue: 0.98, alpha: 0.20).cgColor
+        coneLayer.strokeColor = UIColor(red: 0.02, green: 0.40, blue: 0.94, alpha: 0.42).cgColor
+        coneLayer.lineWidth = 1
+        coneLayer.lineJoin = .round
+        layer.addSublayer(coneLayer)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func setHeading(_ degrees: Double?) {
+        coneLayer.isHidden = degrees == nil
+        guard let degrees else { return }
+        coneLayer.setAffineTransform(CGAffineTransform(rotationAngle: degrees * .pi / 180))
+    }
+}
+
 final class TrailNameView: MKAnnotationView {
     private let titleLabel = UILabel()
 
@@ -1021,6 +1090,43 @@ extension NSColor {
 extension NSImage {
     static func atlasSymbol(named name: String) -> NSImage? {
         NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    }
+}
+
+final class HeadingConeView: MKAnnotationView {
+    private let coneLayer = CAShapeLayer()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        bounds = CGRect(x: 0, y: 0, width: 72, height: 72)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        isEnabled = false
+        canShowCallout = false
+        displayPriority = .required
+        layer?.zPosition = -100
+
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 36, y: 36))
+        path.addLine(to: CGPoint(x: 23, y: 64))
+        path.addQuadCurve(to: CGPoint(x: 49, y: 64), control: CGPoint(x: 36, y: 71))
+        path.closeSubpath()
+        coneLayer.frame = bounds
+        coneLayer.path = path
+        coneLayer.fillColor = NSColor(red: 0.05, green: 0.48, blue: 0.98, alpha: 0.20).cgColor
+        coneLayer.strokeColor = NSColor(red: 0.02, green: 0.40, blue: 0.94, alpha: 0.42).cgColor
+        coneLayer.lineWidth = 1
+        coneLayer.lineJoin = .round
+        layer?.addSublayer(coneLayer)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func setHeading(_ degrees: Double?) {
+        coneLayer.isHidden = degrees == nil
+        guard let degrees else { return }
+        // AppKit's annotation coordinate system is vertically flipped from UIKit.
+        coneLayer.setAffineTransform(CGAffineTransform(rotationAngle: -degrees * .pi / 180))
     }
 }
 
@@ -1178,6 +1284,15 @@ final class RouteWaypointAnnotation: NSObject, MKAnnotation {
         self.routePointIndex = routePointIndex
         self.waypointID = waypointID
         self.kind = kind
+    }
+}
+
+final class HeadingConeAnnotation: NSObject, MKAnnotation {
+    @objc dynamic var coordinate: CLLocationCoordinate2D
+    var headingDegrees: Double?
+
+    init(coordinate: CLLocationCoordinate2D) {
+        self.coordinate = coordinate
     }
 }
 
