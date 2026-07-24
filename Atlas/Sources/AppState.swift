@@ -897,17 +897,25 @@ final class AppState: ObservableObject {
             }
             normalizeCurrentRouteName()
             recordedPlan = currentRoutePlan()
-            if recordedPlan.coordinates.count > 1 { routes.save(recordedPlan) }
         } else {
             recordedPlan = currentRoutePlan()
         }
         if let hike = hikeRecorder.finish(recordedRoute: recordedPlan) {
-            hikes.save(hike)
             completedHike = hike
         }
         location.endHikeTracking()
         isTracking = false
         distanceFromRouteMeters = nil
+    }
+
+    func saveCompletedHike() {
+        guard let completedHike else { return }
+        hikes.save(completedHike)
+        self.completedHike = nil
+    }
+
+    func discardCompletedHike() {
+        completedHike = nil
     }
 
     func cancelActiveHike() {

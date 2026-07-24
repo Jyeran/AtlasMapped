@@ -49,14 +49,9 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $state.completedHike) { hike in
-            NavigationStack {
-                HikeSummaryView(hike: hike)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { state.completedHike = nil }
-                        }
-                    }
-            }
+            HikeCompletionReviewView(hike: hike)
+                .environmentObject(state)
+                .interactiveDismissDisabled()
         }
         .task { state.location.requestAccessAndStart() }
     }

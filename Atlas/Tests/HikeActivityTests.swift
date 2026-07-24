@@ -65,6 +65,103 @@ final class HikeActivityTests: XCTestCase {
         XCTAssertNotNil(split.coordinate)
     }
 
+    func testPaceTrackBreaksAtPausedSegmentsAndRetainsPace() {
+        let start = Date(timeIntervalSince1970: 4_000)
+        let samples = [
+            HikeTrackSample(location: location(39, -105, at: start), beginsSegment: true),
+            HikeTrackSample(location: location(39.001, -105, at: start.addingTimeInterval(60)), beginsSegment: false),
+            HikeTrackSample(location: location(40, -106, at: start.addingTimeInterval(120)), beginsSegment: true),
+            HikeTrackSample(location: location(40.001, -106, at: start.addingTimeInterval(180)), beginsSegment: false)
+        ]
+
+        let segments = HikePaceTrackBuilder.segments(from: samples)
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertTrue(segments.allSatisfy { $0.coordinates.count == 2 })
+        XCTAssertTrue(segments.allSatisfy { $0.secondsPerMile != nil })
+        XCTAssertFalse(segments.contains {
+            $0.coordinates.first?.latitude == 39.001 && $0.coordinates.last?.latitude == 40
+        })
+    }
+
+    func testPaceTrackCapsRenderSegmentsForLongRecordings() {
+        let start = Date(timeIntervalSince1970: 5_000)
+        let samples = (0..<1_001).map { index in
+            HikeTrackSample(
+                location: location(
+                    39 + Double(index) * 0.00001,
+                    -105,
+                    at: start.addingTimeInterval(Double(index) * 2)
+                ),
+                beginsSegment: index == 0
+            )
+        }
+
+        let segments = HikePaceTrackBuilder.segments(from: samples, targetSegmentCount: 100)
+
+        XCTAssertLessThanOrEqual(segments.count, 100)
+        XCTAssertEqual(segments.first?.coordinates.first?.latitude ?? 0, 39, accuracy: 0.000_001)
+        XCTAssertEqual(segments.last?.coordinates.last?.latitude ?? 0, 39.01, accuracy: 0.000_001)
+    }
+
+    func testHikeLibraryCanSaveReopenAndDeleteFullTrack() throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("atlas-hike-library-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let start = Date(timeIntervalSince1970: 6_000)
+        let sample = HikeTrackSample(location: location(39, -105, at: start), beginsSegment: true)
+        let route = RoutePlan(
+            name: "Archived track",
+            coordinates: [sample.coordinate.coordinate],
+            distanceMeters: 0,
+            elevationGainMeters: 0
+        )
+        let hike = RecordedHike(
+            id: UUID(),
+            name: "Archived track",
+            mode: .freeRecording,
+            startedAt: start,
+            endedAt: start.addingTimeInterval(60),
+            activeDuration: 60,
+            samples: [sample],
+            splits: [],
+            sourceRoute: nil,
+            recordedRoute: route
+        )
+
+        let library = HikeLibrary(fileURL: fileURL)
+        library.save(hike)
+        let reopened = try XCTUnwrap(HikeLibrary(fileURL: fileURL).hikes.first)
+        XCTAssertEqual(reopened.id, hike.id)
+        XCTAssertEqual(reopened.samples, hike.samples)
+        XCTAssertEqual(reopened.recordedRoute.waypoints, hike.recordedRoute.waypoints)
+        XCTAssertEqual(reopened.activeDuration, hike.activeDuration)
+
+        library.delete(id: hike.id)
+        XCTAssertTrue(HikeLibrary(fileURL: fileURL).hikes.isEmpty)
+    }
+
+    func testEndingHikeCreatesUnsavedReviewInsteadOfAutoArchive() throws {
+        let state = AppState()
+        let start = Date(timeIntervalSince1970: 7_000)
+        let existingIDs = Set(state.hikes.hikes.map(\.id))
+        state.routePoints = [
+            CLLocationCoordinate2D(latitude: 39, longitude: -105),
+            CLLocationCoordinate2D(latitude: 39.001, longitude: -105)
+        ]
+        state.hikeRecorder.startFreeRecording(at: start)
+        state.hikeRecorder.ingest(location(39, -105, at: start))
+        state.hikeRecorder.ingest(location(39.001, -105, at: start.addingTimeInterval(60)))
+
+        state.endRouteTracking()
+
+        let pending = try XCTUnwrap(state.completedHike)
+        XCTAssertFalse(state.hikes.hikes.contains { $0.id == pending.id })
+        XCTAssertEqual(Set(state.hikes.hikes.map(\.id)), existingIDs)
+        state.discardCompletedHike()
+        XCTAssertNil(state.completedHike)
+    }
+
     private func location(
         _ latitude: Double,
         _ longitude: Double,
