@@ -379,6 +379,24 @@ final class AppState: ObservableObject {
         annotationRevision = UUID()
     }
 
+    func moveRouteElevationProbe(id: UUID, to progress: Double) {
+        guard let index = routeElevationProbes.firstIndex(where: { $0.id == id }) else { return }
+        var clamped = min(1, max(0, progress))
+        if routeElevationProbes.count == 2,
+           let other = routeElevationProbes.first(where: { $0.id != id }) {
+            let minimumSeparation = 0.002
+            if routeElevationProbes[index].progress <= other.progress {
+                clamped = min(clamped, max(0, other.progress - minimumSeparation))
+            } else {
+                clamped = max(clamped, min(1, other.progress + minimumSeparation))
+            }
+        }
+        guard abs(routeElevationProbes[index].progress - clamped) > 0.0001 else { return }
+        routeElevationProbes[index].progress = clamped
+        routeElevationProbes.sort { $0.progress < $1.progress }
+        annotationRevision = UUID()
+    }
+
     func clearRouteElevationProbes() {
         routeElevationProbes.removeAll()
         annotationRevision = UUID()

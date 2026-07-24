@@ -37,7 +37,7 @@ struct RouteDetailsView: View {
                         Text("Elevation sampled from USGS 3DEP terrain along the route.")
                         Spacer()
                         Button("Refresh") { state.refreshElevationProfile() }
-                            .buttonStyle(.plain)
+                            .buttonStyle(AtlasPressButtonStyle())
                             .fontWeight(.bold)
                             .foregroundStyle(AtlasTheme.orange)
                     }
@@ -74,7 +74,7 @@ struct RouteDetailsView: View {
                     .frame(width: 38, height: 38)
                     .background(AtlasTheme.moss.opacity(0.10), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .foregroundStyle(AtlasTheme.forest)
             .accessibilityLabel("Close route details")
         }
@@ -116,8 +116,9 @@ struct RouteDetailsView: View {
                     )
                 },
                 graphHeight: 112,
-                probeProgresses: state.routeElevationProbeSummaries.map(\.progress),
-                onProbeTap: state.selectRouteElevationProbe
+                probeMarkers: state.routeElevationProbeSummaries.map(ElevationProbeMarker.init),
+                onProbeTap: state.selectRouteElevationProbe,
+                onProbeDrag: state.moveRouteElevationProbe
             )
 
             if !state.routeElevationProbeSummaries.isEmpty {
@@ -169,7 +170,7 @@ struct RouteDetailsView: View {
             .padding(14)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .background(AtlasTheme.moss.opacity(0.09), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .disabled(state.isFittingRoute || state.routePoints.count < 2 || state.isRouteFitted)
         .alert("Couldn’t fit route", isPresented: routeFitAlert) {
@@ -216,7 +217,7 @@ struct RouteDetailsView: View {
                 .frame(maxWidth: .infinity, minHeight: 40)
                 .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(enabled ? AtlasTheme.forest : AtlasTheme.moss.opacity(0.42))
         .background(AtlasTheme.moss.opacity(enabled ? 0.10 : 0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .disabled(!enabled)
@@ -324,7 +325,7 @@ private struct WaypointStatsCard: View {
                         Label("Remove waypoint", systemImage: "trash")
                             .font(.caption.weight(.bold))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(.red)
                 }
             }

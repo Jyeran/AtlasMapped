@@ -24,7 +24,7 @@ struct HikeHistoryView: View {
                                 } label: {
                                     hikeRow(hike)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(AtlasPressButtonStyle())
                                 .contextMenu {
                                     Button("Delete hike", systemImage: "trash", role: .destructive) {
                                         state.hikes.delete(id: hike.id)
@@ -200,7 +200,7 @@ struct HikeSummaryView: View {
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(.red)
         .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
@@ -268,7 +268,7 @@ struct HikeCompletionReviewView: View {
                                 .frame(maxWidth: .infinity, minHeight: 52)
                                 .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AtlasPressButtonStyle())
                         .foregroundStyle(.red)
                         .background(.red.opacity(0.09), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
@@ -278,7 +278,7 @@ struct HikeCompletionReviewView: View {
                                 .frame(maxWidth: .infinity, minHeight: 52)
                                 .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AtlasPressButtonStyle())
                         .foregroundStyle(.white)
                         .background(AtlasTheme.forest, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                     }

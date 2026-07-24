@@ -26,7 +26,7 @@ struct OfflineMapsView: View {
         .modifier(OfflineMapsSizing())
         .alert("Delete downloaded map?", isPresented: deletionAlertIsPresented, presenting: areaPendingDeletion) { area in
             Button("Delete \(area.name)", role: .destructive) {
-                withAnimation(.snappy) { state.offline.delete(area) }
+                withAnimation(AtlasMotion.standard) { state.offline.delete(area) }
                 areaPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { areaPendingDeletion = nil }
@@ -60,7 +60,7 @@ struct OfflineMapsView: View {
                     .frame(width: 38, height: 38)
                     .background(AtlasTheme.forest.opacity(0.08), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .foregroundStyle(AtlasTheme.forest)
             .accessibilityLabel("Close offline maps")
         }
@@ -164,7 +164,7 @@ struct OfflineMapsView: View {
                 if let value = state.offline.progress[area.id], value < 1 {
                     Button("Cancel") { state.offline.cancel(area) }
                         .font(.caption.weight(.semibold))
-                        .buttonStyle(.plain)
+                        .buttonStyle(AtlasPressButtonStyle())
                         .foregroundStyle(AtlasTheme.orange)
                 } else if state.offline.isComplete(area) {
                     Image(systemName: "checkmark.circle.fill")
@@ -176,7 +176,7 @@ struct OfflineMapsView: View {
                             .frame(width: 36, height: 36)
                             .background(AtlasTheme.moss.opacity(0.12), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(AtlasTheme.forest)
                     .accessibilityLabel("Resume \(area.name)")
                 }
@@ -187,7 +187,7 @@ struct OfflineMapsView: View {
                         .frame(width: 38, height: 38)
                         .background(AtlasTheme.orange.opacity(0.10), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AtlasPressButtonStyle())
                 .foregroundStyle(AtlasTheme.orange)
                 .accessibilityLabel("Delete \(area.name)")
             }

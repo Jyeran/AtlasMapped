@@ -36,7 +36,7 @@ struct RouteTransferView: View {
         .modifier(RouteTransferSizing())
         .alert("Delete this route?", isPresented: deletionAlertIsPresented, presenting: routePendingDeletion) { plan in
             Button("Delete \(plan.name)", role: .destructive) {
-                withAnimation(.snappy) { state.routes.delete(plan) }
+                withAnimation(AtlasMotion.standard) { state.routes.delete(plan) }
                 message = "Deleted \(plan.name) from this device."
                 routePendingDeletion = nil
             }
@@ -82,7 +82,7 @@ struct RouteTransferView: View {
                     .frame(width: 38, height: 38)
                     .background(AtlasTheme.forest.opacity(0.08), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .foregroundStyle(AtlasTheme.forest)
             .accessibilityLabel("Close route plans")
         }
@@ -200,7 +200,7 @@ struct RouteTransferView: View {
                     .background(AtlasTheme.forest, in: Capsule())
                     .foregroundStyle(.white)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
 
             Button(role: .destructive) { routePendingDeletion = plan } label: {
                 Image(systemName: "trash")
@@ -208,7 +208,7 @@ struct RouteTransferView: View {
                     .frame(width: 38, height: 38)
                     .background(AtlasTheme.orange.opacity(0.10), in: Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .foregroundStyle(AtlasTheme.orange)
             .accessibilityLabel("Delete \(plan.name)")
         }

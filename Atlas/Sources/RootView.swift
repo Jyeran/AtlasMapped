@@ -21,7 +21,7 @@ struct RootView: View {
                         .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 260)
                 } detail: {
                     MapScreen(isSidebarCollapsed: sidebarVisibility == .detailOnly) {
-                        withAnimation(.snappy) { sidebarVisibility = .all }
+                        withAnimation(AtlasMotion.panel) { sidebarVisibility = .all }
                     }
                 }
             } else {
@@ -30,7 +30,7 @@ struct RootView: View {
         }
         .onChange(of: state.isTracking) { _, isTracking in
             guard isTracking, usesSidebar else { return }
-            withAnimation(.snappy) { sidebarVisibility = .detailOnly }
+            withAnimation(AtlasMotion.panel) { sidebarVisibility = .detailOnly }
         }
         .sheet(isPresented: $state.showOfflineMaps) {
             OfflineMapsView()

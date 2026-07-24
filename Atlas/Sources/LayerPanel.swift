@@ -12,7 +12,7 @@ struct LayerPanel: View {
                     Image(systemName: "xmark")
                         .frame(width: 28, height: 28)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AtlasPressButtonStyle())
                 .accessibilityLabel("Close layers")
             }
             .padding(.bottom, 4)
@@ -31,7 +31,7 @@ struct LayerPanel: View {
             Button { state.showTrails.toggle() } label: {
                 layerRow("Detailed trails", symbol: "figure.hiking", selected: state.showTrails)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
 
             Text("OSM paths + official Forest Service trails, with names and trailheads.")
                 .font(.caption2)

@@ -33,6 +33,13 @@ struct TrailViewport: Sendable {
             && coordinate.longitude >= west && coordinate.longitude <= east
     }
 
+    func contains(_ viewport: TrailViewport) -> Bool {
+        viewport.south >= south
+            && viewport.west >= west
+            && viewport.north <= north
+            && viewport.east <= east
+    }
+
     func chunks(maximumSpan: Double) -> [TrailViewport] {
         let rows = max(1, Int(ceil((north - south) / maximumSpan)))
         let columns = max(1, Int(ceil((east - west) / maximumSpan)))

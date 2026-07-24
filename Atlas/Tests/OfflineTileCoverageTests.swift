@@ -4,6 +4,15 @@ import XCTest
 @testable import AtlasMapped
 
 final class OfflineTileCoverageTests: XCTestCase {
+    func testResidentTrailViewportCoversNearbyMapMovement() {
+        let resident = TrailViewport(south: 39.8, west: -105.4, north: 40.2, east: -104.9)
+        let nearby = TrailViewport(south: 39.9, west: -105.2, north: 40.1, east: -105.0)
+        let outside = TrailViewport(south: 40.1, west: -105.2, north: 40.3, east: -105.0)
+
+        XCTAssertTrue(resident.contains(nearby))
+        XCTAssertFalse(resident.contains(outside))
+    }
+
     func testDisplayOverlayCanStreamWithoutExpandingOfflineCache() {
         let overlay = CachedTileOverlay(
             kind: .topographic,

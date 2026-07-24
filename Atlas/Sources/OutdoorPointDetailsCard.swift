@@ -34,7 +34,7 @@ struct OutdoorPointDetailsCard: View {
                             .frame(width: 28, height: 28)
                             .background(AtlasTheme.moss.opacity(0.10), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(AtlasTheme.forest)
                     .accessibilityLabel("Close place details")
                 }

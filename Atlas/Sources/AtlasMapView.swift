@@ -76,7 +76,15 @@ struct AtlasMapView {
         private var appliedTrails = false
         private var appliedNetworkAccess: Bool?
         private var trailLoadTask: Task<Void, Never>?
+        private var forestLoadTask: Task<Void, Never>?
         private var trailLoadGeneration = UUID()
+        private var pendingTrailViewport: TrailViewport?
+        private struct ResidentTrailCell {
+            let key: String
+            let viewport: TrailViewport
+            let dataset: TrailMapDataset
+        }
+        private var residentTrailCells: [ResidentTrailCell] = []
         private var loadedTrailDataset = TrailMapDataset(trails: [], points: [])
         private var loadedTrailsByID: [String: TrailMapFeature] = [:]
         private var loadedPointsByID: [String: OutdoorPointFeature] = [:]
@@ -127,6 +135,10 @@ struct AtlasMapView {
                 scheduleTrailRefresh(on: map)
             } else {
                 trailLoadTask?.cancel()
+                forestLoadTask?.cancel()
+                trailLoadTask = nil
+                forestLoadTask = nil
+                pendingTrailViewport = nil
                 clearTrailContent(on: map)
             }
         }
@@ -385,7 +397,11 @@ struct AtlasMapView {
                 view.glyphImage = PlatformImage.atlasSymbol(named: feature.kind.symbol)
                 view.titleVisibility = .visible
                 view.canShowCallout = false
-                view.displayPriority = feature.kind == .trailhead || feature.kind == .peak ? .defaultHigh : .defaultLow
+                view.collisionMode = .circle
+                view.displayPriority = switch feature.kind {
+                case .trailhead, .peak, .saddle: .required
+                default: .defaultHigh
+                }
                 return view
             }
             if let pin = annotation as? RoutePinAnnotation {
@@ -614,16 +630,30 @@ struct AtlasMapView {
         }
 
         private func scheduleTrailRefresh(on map: MKMapView) {
-            trailLoadTask?.cancel()
             guard map.region.span.latitudeDelta <= 0.32, map.region.span.longitudeDelta <= 0.48 else {
-                clearTrailContent(on: map)
+                // Keep the last detailed cell visible while the user briefly
+                // zooms out. It is substantially less jarring than blanking
+                // trails and icons at the threshold.
                 return
             }
 
             let region = map.region
-            let latitudePadding = region.span.latitudeDelta * 0.35
-            let longitudePadding = region.span.longitudeDelta * 0.35
-            let rawViewport = TrailViewport(
+            let visibleViewport = TrailViewport(
+                south: max(-85, region.center.latitude - region.span.latitudeDelta / 2),
+                west: max(-180, region.center.longitude - region.span.longitudeDelta / 2),
+                north: min(85, region.center.latitude + region.span.latitudeDelta / 2),
+                east: min(180, region.center.longitude + region.span.longitudeDelta / 2)
+            )
+            if residentTrailCells.contains(where: { $0.viewport.contains(visibleViewport) }) {
+                return
+            }
+
+            // A generous apron keeps nearby trails and POIs resident through
+            // ordinary roaming instead of replacing them one viewport at a
+            // time.
+            let latitudePadding = region.span.latitudeDelta * 0.85
+            let longitudePadding = region.span.longitudeDelta * 0.85
+            let requestedViewport = TrailViewport(
                 south: max(-85, region.center.latitude - region.span.latitudeDelta / 2 - latitudePadding),
                 west: max(-180, region.center.longitude - region.span.longitudeDelta / 2 - longitudePadding),
                 north: min(85, region.center.latitude + region.span.latitudeDelta / 2 + latitudePadding),
@@ -631,24 +661,40 @@ struct AtlasMapView {
             )
             let largestSpan = max(region.span.latitudeDelta, region.span.longitudeDelta)
             let gridSize = largestSpan <= 0.08 ? 0.04 : (largestSpan <= 0.28 ? 0.10 : 0.25)
-            let viewport = rawViewport.alignedToGrid(cellSize: gridSize)
+            pendingTrailViewport = requestedViewport.alignedToGrid(cellSize: gridSize)
+            startPendingTrailRefresh(on: map)
+        }
+
+        private func startPendingTrailRefresh(on map: MKMapView) {
+            guard trailLoadTask == nil,
+                  let viewport = pendingTrailViewport else { return }
+            pendingTrailViewport = nil
+            if residentTrailCells.contains(where: { $0.key == viewport.cacheKey }) { return }
+
             let generation = UUID()
             trailLoadGeneration = generation
             trailLoadTask = Task { [weak self, weak map] in
                 do {
-                    try await Task.sleep(for: .milliseconds(280))
+                    try await Task.sleep(for: .milliseconds(110))
                     let dataset = try await TrailDataService.shared.trailFeatures(in: viewport)
                     try Task.checkCancellation()
                     guard let self, let map, self.trailLoadGeneration == generation, self.appliedTrails else { return }
-                    self.applyTrailDataset(dataset, on: map)
+                    self.applyTrailDataset(dataset, covering: viewport, on: map)
+                    self.trailLoadTask = nil
+                    self.startPendingTrailRefresh(on: map)
 
-                    // The national Forest Service service is useful but often
-                    // much slower than OSM. Add it when ready instead of making
-                    // the user stare at an empty overlay while it responds.
-                    if let forestTrails = try? await TrailDataService.shared.forestServiceTrailFeatures(in: viewport),
-                       !forestTrails.isEmpty {
-                        try Task.checkCancellation()
-                        guard self.trailLoadGeneration == generation, self.appliedTrails else { return }
+                    // Supplemental Forest Service geometry arrives
+                    // independently so a slow national request cannot block
+                    // the next neighboring OSM cell.
+                    self.forestLoadTask?.cancel()
+                    self.forestLoadTask = Task { [weak self, weak map] in
+                        guard let forestTrails = try? await TrailDataService.shared
+                            .forestServiceTrailFeatures(in: viewport),
+                            !forestTrails.isEmpty,
+                            let self,
+                            let map,
+                            self.trailLoadGeneration == generation,
+                            self.appliedTrails else { return }
                         self.applyTrailDataset(
                             TrailMapDataset(
                                 trails: dataset.trails + forestTrails,
@@ -656,27 +702,62 @@ struct AtlasMapView {
                                 waterways: dataset.waterways,
                                 contours: dataset.contours
                             ),
+                            covering: viewport,
                             on: map
                         )
+                        self.forestLoadTask = nil
                     }
                 } catch is CancellationError {
+                    self?.trailLoadTask = nil
                     return
                 } catch {
+                    self?.trailLoadTask = nil
+                    if let self, let map {
+                        self.startPendingTrailRefresh(on: map)
+                    }
                     return
                 }
             }
         }
 
-        private func applyTrailDataset(_ dataset: TrailMapDataset, on map: MKMapView) {
-            clearTrailContent(on: map)
-            loadedTrailDataset = dataset
-            loadedTrailsByID = TrailFeatureIndex.trailsByID(dataset.trails)
-            loadedPointsByID = TrailFeatureIndex.pointsByID(dataset.points)
+        private func applyTrailDataset(
+            _ dataset: TrailMapDataset,
+            covering viewport: TrailViewport,
+            on map: MKMapView
+        ) {
+            let cell = ResidentTrailCell(
+                key: viewport.cacheKey,
+                viewport: viewport,
+                dataset: dataset
+            )
+            residentTrailCells.removeAll { $0.key == cell.key }
+            residentTrailCells.append(cell)
+            if residentTrailCells.count > 4 {
+                residentTrailCells.removeFirst(residentTrailCells.count - 4)
+            }
+            let dataset = mergedResidentTrailDataset()
+
+            let existingTrailOverlays = Dictionary(
+                map.overlays.compactMap { overlay -> (String, TrailPolyline)? in
+                    guard let trail = overlay as? TrailPolyline else { return nil }
+                    return (trail.featureID, trail)
+                },
+                uniquingKeysWith: { existing, _ in existing }
+            )
 
             var longestNamedTrail: [String: TrailMapFeature] = [:]
             var trailOverlays: [TrailPolyline] = []
             trailOverlays.reserveCapacity(dataset.trails.count)
+            var desiredTrailIDs = Set<String>()
             for feature in dataset.trails {
+                desiredTrailIDs.insert(feature.id)
+                if existingTrailOverlays[feature.id] != nil {
+                    if let name = feature.name,
+                       feature.coordinates.count > (longestNamedTrail[name]?.coordinates.count ?? 0) {
+                        longestNamedTrail[name] = feature
+                    }
+                    continue
+                }
                 let coordinates = feature.coordinates.map(\.coordinate)
                 guard coordinates.count > 1 else { continue }
                 let polyline = TrailPolyline(coordinates: coordinates, count: coordinates.count)
@@ -693,10 +774,24 @@ struct AtlasMapView {
             if !trailOverlays.isEmpty {
                 map.addOverlays(trailOverlays, level: .aboveRoads)
             }
+            let staleTrailOverlays = existingTrailOverlays.compactMap {
+                desiredTrailIDs.contains($0.key) ? nil : $0.value
+            }
+            if !staleTrailOverlays.isEmpty { map.removeOverlays(staleTrailOverlays) }
 
+            let existingTrailNames = Dictionary(
+                map.annotations.compactMap { annotation -> (String, TrailNameAnnotation)? in
+                    guard let trailName = annotation as? TrailNameAnnotation else { return nil }
+                    return (trailName.featureID, trailName)
+                },
+                uniquingKeysWith: { existing, _ in existing }
+            )
+            let desiredTrailNameIDs = Set(longestNamedTrail.values.map(\.id))
             let names = longestNamedTrail.compactMap { name, feature -> TrailNameAnnotation? in
                 let importance = feature.importance ?? .standard
-                guard !feature.coordinates.isEmpty, importance != .minor else { return nil }
+                guard !feature.coordinates.isEmpty,
+                      importance != .minor,
+                      existingTrailNames[feature.id] == nil else { return nil }
                 return TrailNameAnnotation(
                     coordinate: feature.coordinates[feature.coordinates.count / 2].coordinate,
                     name: name,
@@ -705,9 +800,56 @@ struct AtlasMapView {
                 )
             }
             map.addAnnotations(names)
-            map.addAnnotations(dataset.points.map {
-                OutdoorPointAnnotation(feature: $0)
+            let staleTrailNames = existingTrailNames.compactMap {
+                desiredTrailNameIDs.contains($0.key) ? nil : $0.value
+            }
+            if !staleTrailNames.isEmpty { map.removeAnnotations(staleTrailNames) }
+
+            let existingPoints = Dictionary(
+                map.annotations.compactMap { annotation -> (String, OutdoorPointAnnotation)? in
+                    guard let point = annotation as? OutdoorPointAnnotation else { return nil }
+                    return (point.featureID, point)
+                },
+                uniquingKeysWith: { existing, _ in existing }
+            )
+            let desiredPointIDs = Set(dataset.points.map(\.id))
+            map.addAnnotations(dataset.points.compactMap { feature in
+                existingPoints[feature.id] == nil ? OutdoorPointAnnotation(feature: feature) : nil
             })
+            let stalePoints = existingPoints.compactMap {
+                desiredPointIDs.contains($0.key) ? nil : $0.value
+            }
+            if !stalePoints.isEmpty { map.removeAnnotations(stalePoints) }
+
+            // Content with stable feature IDs stays attached to MapKit across
+            // requests. This avoids annotation-view reuse flashes and overlay
+            // renderer churn during ordinary panning.
+            loadedTrailDataset = dataset
+            loadedTrailsByID = TrailFeatureIndex.trailsByID(dataset.trails)
+            loadedPointsByID = TrailFeatureIndex.pointsByID(dataset.points)
+        }
+
+        private func mergedResidentTrailDataset() -> TrailMapDataset {
+            let trails = TrailFeatureIndex.trailsByID(
+                residentTrailCells.flatMap(\.dataset.trails)
+            )
+            let points = TrailFeatureIndex.pointsByID(
+                residentTrailCells.flatMap(\.dataset.points)
+            )
+            let waterways = Dictionary(
+                residentTrailCells.flatMap(\.dataset.waterways).map { ($0.id, $0) },
+                uniquingKeysWith: { existing, _ in existing }
+            )
+            let contours = Dictionary(
+                residentTrailCells.flatMap(\.dataset.contours).map { ($0.id, $0) },
+                uniquingKeysWith: { existing, _ in existing }
+            )
+            return TrailMapDataset(
+                trails: Array(trails.values),
+                points: Array(points.values),
+                waterways: Array(waterways.values),
+                contours: Array(contours.values)
+            )
         }
 
         private func clearTrailContent(on map: MKMapView) {
@@ -720,6 +862,7 @@ struct AtlasMapView {
             loadedTrailDataset = TrailMapDataset(trails: [], points: [])
             loadedTrailsByID.removeAll(keepingCapacity: true)
             loadedPointsByID.removeAll(keepingCapacity: true)
+            residentTrailCells.removeAll(keepingCapacity: true)
         }
 
         private func activate(feature: TrailMapFeature) {

@@ -9,6 +9,23 @@ enum AtlasTheme {
     static let panelRadius: CGFloat = 18
 }
 
+enum AtlasMotion {
+    static let quick = Animation.smooth(duration: 0.16)
+    static let standard = Animation.smooth(duration: 0.24)
+    static let panel = Animation.spring(response: 0.34, dampingFraction: 0.86)
+}
+
+struct AtlasPressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.965 : 1)
+            .opacity(configuration.isPressed ? 0.76 : 1)
+            .animation(AtlasMotion.quick, value: configuration.isPressed)
+    }
+}
+
 extension RouteWaypointKind {
     var color: Color {
         switch self {

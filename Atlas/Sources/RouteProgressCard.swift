@@ -41,7 +41,7 @@ struct RouteProgressCard: View {
                 .frame(width: 64, height: 22)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .accessibilityLabel("Show route and waypoint details")
         }
         .overlay(alignment: .topTrailing) {
@@ -65,7 +65,7 @@ struct RouteProgressCard: View {
                         .frame(width: 28, height: 28)
                         .background(.primary.opacity(0.07), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AtlasPressButtonStyle())
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Clear active route")
                 }
@@ -171,8 +171,9 @@ struct RouteProgressCard: View {
                 showsPosition: state.isTracking,
                 isLoading: state.isLoadingElevationProfile,
                 error: state.elevationProfileError,
-                probeProgresses: state.routeElevationProbeSummaries.map(\.progress),
-                onProbeTap: state.selectRouteElevationProbe
+                probeMarkers: state.routeElevationProbeSummaries.map(ElevationProbeMarker.init),
+                onProbeTap: state.selectRouteElevationProbe,
+                onProbeDrag: state.moveRouteElevationProbe
             )
 
             if !state.routeElevationProbeSummaries.isEmpty {
@@ -194,7 +195,7 @@ struct RouteProgressCard: View {
                 .frame(minWidth: 126, minHeight: 46)
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(.white)
         .background(AtlasTheme.orange, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .accessibilityHint("Starts GPS progress tracking for this route")
@@ -204,14 +205,14 @@ struct RouteProgressCard: View {
         Button {
             commitRouteName()
             state.saveCurrentRoute()
-            withAnimation(.snappy) { didSave = true }
+            withAnimation(AtlasMotion.standard) { didSave = true }
         } label: {
             Label(didSave ? "Saved" : "Save route", systemImage: didSave ? "checkmark" : "bookmark.fill")
                 .font(.system(size: 14, weight: .bold))
                 .frame(minWidth: 108, minHeight: 44)
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(didSave ? .white : AtlasTheme.forest)
         .background(
             didSave ? AtlasTheme.forest : AtlasTheme.moss.opacity(0.12),
@@ -243,7 +244,7 @@ struct RouteProgressCard: View {
             .frame(minWidth: horizontalSizeClass == .compact ? 44 : 92, minHeight: 44)
             .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(AtlasTheme.forest)
         .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .disabled(state.isFittingRoute || state.routePoints.count < 2 || state.isRouteFitted)
@@ -294,7 +295,7 @@ struct RouteProgressCard: View {
                 .frame(minWidth: 82, minHeight: 42)
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(AtlasTheme.forest)
         .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
@@ -306,7 +307,7 @@ struct RouteProgressCard: View {
                 .frame(minWidth: 72, minHeight: 42)
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(AtlasTheme.forest)
         .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .disabled(state.hikeRecorder.samples.isEmpty || state.isTrackingPaused)
@@ -319,7 +320,7 @@ struct RouteProgressCard: View {
                 .frame(minWidth: 64, minHeight: 42)
                 .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(AtlasTheme.orange)
         .background(AtlasTheme.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
         .accessibilityHint("Stops tracking and keeps the route loaded")
@@ -337,6 +338,7 @@ struct RouteProgressCard: View {
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
+                .contentTransition(.numericText())
         }
         .frame(minWidth: 62, alignment: .leading)
     }
@@ -424,7 +426,7 @@ struct RouteProgressCard: View {
                 .frame(width: 28, height: 28)
                 .background(.primary.opacity(isEnabled ? 0.07 : 0.035), in: Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(isEnabled ? AtlasTheme.forest : .secondary.opacity(0.42))
         .disabled(!isEnabled)
         .accessibilityLabel(label)
@@ -460,6 +462,18 @@ struct ElevationWaypointMarker: Identifiable {
     let kind: RouteWaypointKind
 }
 
+struct ElevationProbeMarker: Identifiable {
+    let id: UUID
+    let label: String
+    let progress: Double
+
+    init(_ summary: RouteElevationProbeSummary) {
+        id = summary.id
+        label = summary.label
+        progress = summary.progress
+    }
+}
+
 struct ElevationProfileView: View {
     let elevations: [Double]
     @Binding var mode: ElevationChartMode
@@ -469,8 +483,10 @@ struct ElevationProfileView: View {
     let error: String?
     var waypointMarkers: [ElevationWaypointMarker] = []
     var graphHeight: CGFloat = 48
-    var probeProgresses: [Double] = []
+    var probeMarkers: [ElevationProbeMarker] = []
     var onProbeTap: ((Double) -> Void)?
+    var onProbeDrag: ((UUID, Double) -> Void)?
+    @State private var draggedProbeID: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -485,7 +501,7 @@ struct ElevationProfileView: View {
                 HStack(spacing: 2) {
                     ForEach(ElevationChartMode.allCases) { option in
                         Button {
-                            withAnimation(.snappy) { mode = option }
+                            withAnimation(AtlasMotion.standard) { mode = option }
                         } label: {
                             Text(option.title.uppercased())
                                 .font(.system(size: 8, weight: .bold, design: .rounded))
@@ -499,7 +515,7 @@ struct ElevationProfileView: View {
                                     in: Capsule()
                                 )
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(AtlasPressButtonStyle())
                         .accessibilityLabel("Show \(option.accessibilityTitle)")
                         .accessibilityAddTraits(mode == option ? .isSelected : [])
                     }
@@ -565,8 +581,8 @@ struct ElevationProfileView: View {
                             .position(markerPoint)
                     }
 
-                    ForEach(Array(probeProgresses.prefix(2).enumerated()), id: \.offset) { index, probeProgress in
-                        let probePoint = point(at: probeProgress, in: proxy.size)
+                    ForEach(Array(probeMarkers.prefix(2).enumerated()), id: \.element.id) { index, probe in
+                        let probePoint = point(at: probe.progress, in: proxy.size)
                         Path { path in
                             path.move(to: CGPoint(x: probePoint.x, y: 1))
                             path.addLine(to: CGPoint(x: probePoint.x, y: proxy.size.height - 1))
@@ -576,14 +592,47 @@ struct ElevationProfileView: View {
                             style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
                         )
 
-                        Text(index == 0 ? "A" : "B")
-                            .font(.system(size: 8.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(width: 19, height: 19)
-                            .background(elevationProbeColor(index), in: Circle())
-                            .overlay(Circle().stroke(.white, lineWidth: 2))
-                            .shadow(color: elevationProbeColor(index).opacity(0.32), radius: 3)
+                        ZStack {
+                            Circle()
+                                .fill(.clear)
+                                .frame(width: 44, height: 44)
+                            Text(probe.label)
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(elevationProbeColor(index), in: Circle())
+                                .overlay(Circle().stroke(.white, lineWidth: 2))
+                                .shadow(
+                                    color: elevationProbeColor(index).opacity(
+                                        draggedProbeID == probe.id ? 0.55 : 0.32
+                                    ),
+                                    radius: draggedProbeID == probe.id ? 6 : 3
+                                )
+                        }
+                            .contentShape(Circle())
+                            .scaleEffect(draggedProbeID == probe.id ? 1.12 : 1)
                             .position(probePoint)
+                            .highPriorityGesture(
+                                DragGesture(
+                                    minimumDistance: 0,
+                                    coordinateSpace: .named("atlas-elevation-chart")
+                                )
+                                .onChanged { value in
+                                    if draggedProbeID != probe.id {
+                                        withAnimation(AtlasMotion.quick) {
+                                            draggedProbeID = probe.id
+                                        }
+                                    }
+                                    guard proxy.size.width > 0 else { return }
+                                    let progress = min(1, max(0, value.location.x / proxy.size.width))
+                                    onProbeDrag?(probe.id, progress)
+                                }
+                                .onEnded { _ in
+                                    withAnimation(AtlasMotion.quick) {
+                                        draggedProbeID = nil
+                                    }
+                                }
+                            )
                     }
 
                     if showsPosition {
@@ -604,13 +653,15 @@ struct ElevationProfileView: View {
                             onProbeTap?(min(1, max(0, value.location.x / proxy.size.width)))
                         }
                 )
+                .coordinateSpace(name: "atlas-elevation-chart")
             }
             .frame(height: graphHeight)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Route \(mode.accessibilityTitle)")
         .accessibilityValue(showsPosition ? "Current position \(progress.formatted(.percent))" : "Tracking not started")
-        .accessibilityHint("Tap two points to compare elevation and distance along the route")
+        .accessibilityHint("Tap two points to compare them, then drag A or B along the profile")
+        .sensoryFeedback(.selection, trigger: draggedProbeID)
     }
 
     private func graphPoints(in size: CGSize) -> [CGPoint] {
@@ -691,7 +742,7 @@ struct ElevationProbeReadout: View {
                 .frame(minHeight: compact ? 32 : 36)
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .foregroundStyle(AtlasTheme.forest)
         .background(AtlasTheme.moss.opacity(0.13), in: Capsule())
         .accessibilityLabel("Clear elevation comparison")

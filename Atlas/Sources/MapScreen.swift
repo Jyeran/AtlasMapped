@@ -40,7 +40,7 @@ struct MapScreen: View {
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(AtlasPressButtonStyle())
                                 .atlasPanel()
                                 .accessibilityLabel("Show sidebar")
                             }
@@ -56,6 +56,11 @@ struct MapScreen: View {
                                 Spacer()
                                 LayerPanel()
                             }
+                            .transition(
+                                .move(edge: .top)
+                                    .combined(with: .opacity)
+                                    .combined(with: .scale(scale: 0.97, anchor: .topTrailing))
+                            )
                         }
                     }
                     .padding(.horizontal, 16)
@@ -67,6 +72,7 @@ struct MapScreen: View {
                         VStack(alignment: .leading, spacing: 8) {
                             if state.selectedTool == .measure, state.measurePoints.count > 1 {
                                 MeasurementReadout()
+                                    .transition(.move(edge: .leading).combined(with: .opacity))
                             }
                             MapAttributionBadge()
                         }
@@ -84,6 +90,7 @@ struct MapScreen: View {
                         }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 12)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
             }
@@ -114,8 +121,11 @@ struct MapScreen: View {
                     .zIndex(20)
             }
         }
-        .animation(.snappy, value: state.selectedPinID)
-        .animation(.snappy, value: state.selectedOutdoorPoint?.id)
+        .animation(AtlasMotion.panel, value: state.selectedPinID)
+        .animation(AtlasMotion.panel, value: state.selectedOutdoorPoint?.id)
+        .animation(AtlasMotion.panel, value: state.showLayers)
+        .animation(AtlasMotion.panel, value: state.hasActiveRoute)
+        .animation(AtlasMotion.standard, value: state.measurePoints.count > 1)
         .sheet(isPresented: $showRouteDetails) {
             RouteDetailsView()
                 .environmentObject(state)
@@ -173,7 +183,7 @@ struct MapScreen: View {
                     .frame(width: usesCompactTopControls ? 42 : 44, height: usesCompactTopControls ? 42 : 44)
             }
             .menuIndicator(.hidden)
-            .buttonStyle(.plain)
+            .buttonStyle(AtlasPressButtonStyle())
             .atlasPanel()
             .accessibilityLabel("Map menu")
         }
@@ -189,7 +199,7 @@ struct MapScreen: View {
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: usesCompactTopControls ? 42 : 44, height: usesCompactTopControls ? 42 : 44)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
         .atlasPanel()
         .accessibilityLabel(accessibilityLabel)
     }
@@ -429,7 +439,7 @@ struct MapSearchView: View {
                         .frame(width: 42, height: 42)
                         .background(AtlasTheme.moss.opacity(0.10), in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AtlasPressButtonStyle())
                 .foregroundStyle(AtlasTheme.forest)
                 .accessibilityLabel("Close search")
             }
@@ -448,7 +458,7 @@ struct MapSearchView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(AtlasTheme.moss.opacity(0.72))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .accessibilityLabel("Clear search")
                 }
             }
@@ -538,7 +548,7 @@ struct MapSearchView: View {
                         .stroke(AtlasTheme.moss.opacity(0.11), lineWidth: 1)
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(AtlasPressButtonStyle())
     }
     #endif
 
@@ -698,7 +708,7 @@ struct OfflineSelectionHUD: View {
                 Spacer()
                 Button("Cancel") { state.cancelOfflineSelection() }
                     .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(AtlasTheme.orange)
             }
             .padding(14)
@@ -780,6 +790,8 @@ private struct OfflinePrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 46)
             .background(AtlasTheme.orange, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
             .opacity(configuration.isPressed ? 0.72 : 1)
+            .scaleEffect(configuration.isPressed ? 0.975 : 1)
+            .animation(AtlasMotion.quick, value: configuration.isPressed)
     }
 }
 
@@ -791,6 +803,8 @@ private struct OfflineSecondaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity, minHeight: 46)
             .background(AtlasTheme.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
             .opacity(configuration.isPressed ? 0.65 : 1)
+            .scaleEffect(configuration.isPressed ? 0.975 : 1)
+            .animation(AtlasMotion.quick, value: configuration.isPressed)
     }
 }
 
@@ -828,11 +842,13 @@ struct CompassElevationBar: View {
             Divider().frame(height: compact ? 16 : 18)
             Text("\(Int(heading.rounded()))°")
                 .monospacedDigit()
+                .contentTransition(.numericText())
             Divider().frame(height: compact ? 16 : 18)
             Image(systemName: "mountain.2.fill")
                 .foregroundStyle(AtlasTheme.forest)
             Text(Measurement(value: elevation, unit: UnitLength.meters).formatted(.measurement(width: .abbreviated, usage: .asProvided)))
                 .monospacedDigit()
+                .contentTransition(.numericText())
         }
         .font(.system(size: compact ? 12 : 13, weight: .medium))
         .padding(.horizontal, compact ? 11 : 15)
@@ -840,6 +856,8 @@ struct CompassElevationBar: View {
         .atlasPanel()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Heading \(cardinal(heading)), \(Int(heading)) degrees, elevation \(Int(elevation)) meters")
+        .animation(AtlasMotion.standard, value: Int(heading.rounded()))
+        .animation(AtlasMotion.standard, value: Int(elevation.rounded()))
     }
 
     private func cardinal(_ degrees: Double) -> String {
@@ -883,9 +901,12 @@ struct ToolRail: View {
                 .background {
                     if state.selectedTool == tool {
                         Circle().fill(AtlasTheme.orange).frame(width: 34, height: 34)
+                            .transition(.scale.combined(with: .opacity))
                     }
                 }
         }
+        .animation(AtlasMotion.quick, value: state.selectedTool)
+        .sensoryFeedback(.selection, trigger: state.selectedTool)
         .accessibilityLabel(tool.label)
         .accessibilityHint(toolHint(tool))
     }
@@ -906,6 +927,8 @@ private struct RailButtonStyle: ButtonStyle {
             .frame(width: 46, height: 44)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.5 : 1)
+            .scaleEffect(configuration.isPressed ? 0.93 : 1)
+            .animation(AtlasMotion.quick, value: configuration.isPressed)
     }
 }
 

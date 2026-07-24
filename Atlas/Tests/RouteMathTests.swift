@@ -168,6 +168,28 @@ final class RouteMathTests: XCTestCase {
         XCTAssertEqual(state.routeElevationProbeSummaries[1].progress, 0.7, accuracy: 0.001)
     }
 
+    @MainActor
+    func testElevationProbeCanBeDraggedWithoutCrossingTheOtherProbe() throws {
+        let state = AppState()
+        state.routePoints = [
+            CLLocationCoordinate2D(latitude: 39.0, longitude: -105.0),
+            CLLocationCoordinate2D(latitude: 39.01, longitude: -105.0)
+        ]
+        state.currentElevationProfileProvider = ElevationService.providerID
+        state.currentRouteElevationProfileMeters = [100, 200]
+        state.selectRouteElevationProbe(at: 0.2)
+        state.selectRouteElevationProbe(at: 0.8)
+
+        let firstID = try XCTUnwrap(state.routeElevationProbes.first?.id)
+        state.moveRouteElevationProbe(id: firstID, to: 0.6)
+        XCTAssertEqual(state.routeElevationProbeSummaries[0].progress, 0.6, accuracy: 0.001)
+        XCTAssertEqual(state.routeElevationProbeSummaries[0].elevationMeters ?? 0, 160, accuracy: 0.001)
+
+        state.moveRouteElevationProbe(id: firstID, to: 0.95)
+        XCTAssertLessThan(state.routeElevationProbeSummaries[0].progress, state.routeElevationProbeSummaries[1].progress)
+        XCTAssertEqual(state.routeElevationProbeSummaries[0].progress, 0.798, accuracy: 0.001)
+    }
+
     func testElevationInterpolatesAtRouteProgress() {
         XCTAssertEqual(RouteMath.elevation(at: 0.25, in: [100, 200, 300]), 150)
         XCTAssertEqual(RouteMath.elevation(at: 1, in: [100, 200, 300]), 300)

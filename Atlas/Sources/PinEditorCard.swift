@@ -31,7 +31,7 @@ struct PinEditorCard: View {
                             .frame(width: 28, height: 28)
                             .background(AtlasTheme.moss.opacity(0.10), in: Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(AtlasTheme.forest)
                     .accessibilityLabel("Close pin editor")
                 }
@@ -64,7 +64,7 @@ struct PinEditorCard: View {
                         Label("Remove pin", systemImage: "trash")
                             .font(.caption.weight(.bold))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AtlasPressButtonStyle())
                     .foregroundStyle(.red)
                 }
             }
