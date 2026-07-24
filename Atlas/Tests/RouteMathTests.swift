@@ -87,6 +87,42 @@ final class RouteMathTests: XCTestCase {
         XCTAssertEqual(distances[2], RouteMath.distance(along: route), accuracy: 0.01)
     }
 
+    func testCoordinateAtProgressFollowsRouteDistance() throws {
+        let route = [
+            CLLocationCoordinate2D(latitude: 39.0, longitude: -105.0),
+            CLLocationCoordinate2D(latitude: 39.001, longitude: -105.0),
+            CLLocationCoordinate2D(latitude: 39.003, longitude: -105.0)
+        ]
+
+        let halfway = try XCTUnwrap(RouteMath.coordinate(at: 0.5, along: route))
+        XCTAssertEqual(halfway.latitude, 39.0015, accuracy: 0.000_02)
+        XCTAssertEqual(halfway.longitude, -105.0, accuracy: 0.000_001)
+        XCTAssertEqual(RouteMath.coordinate(at: 0, along: route)?.latitude ?? 0, 39.0, accuracy: 0.000_001)
+        XCTAssertEqual(RouteMath.coordinate(at: 1, along: route)?.latitude ?? 0, 39.003, accuracy: 0.000_001)
+    }
+
+    @MainActor
+    func testElevationProbeSelectionAddsTwoThenMovesNearest() {
+        let state = AppState()
+        state.routePoints = [
+            CLLocationCoordinate2D(latitude: 39.0, longitude: -105.0),
+            CLLocationCoordinate2D(latitude: 39.01, longitude: -105.0)
+        ]
+        state.currentElevationProfileProvider = ElevationService.providerID
+        state.currentRouteElevationProfileMeters = [100, 200]
+
+        state.selectRouteElevationProbe(at: 0.2)
+        state.selectRouteElevationProbe(at: 0.8)
+        XCTAssertEqual(state.routeElevationProbeSummaries.map(\.label), ["A", "B"])
+        XCTAssertEqual(state.routeElevationProbeSummaries[0].elevationMeters ?? 0, 120, accuracy: 0.001)
+        XCTAssertEqual(state.routeElevationProbeSummaries[1].elevationMeters ?? 0, 180, accuracy: 0.001)
+
+        state.selectRouteElevationProbe(at: 0.7)
+        XCTAssertEqual(state.routeElevationProbeSummaries.count, 2)
+        XCTAssertEqual(state.routeElevationProbeSummaries[0].progress, 0.2, accuracy: 0.001)
+        XCTAssertEqual(state.routeElevationProbeSummaries[1].progress, 0.7, accuracy: 0.001)
+    }
+
     func testElevationInterpolatesAtRouteProgress() {
         XCTAssertEqual(RouteMath.elevation(at: 0.25, in: [100, 200, 300]), 150)
         XCTAssertEqual(RouteMath.elevation(at: 1, in: [100, 200, 300]), 300)

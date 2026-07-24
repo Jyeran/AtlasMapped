@@ -43,6 +43,25 @@ struct RouteWaypointSummary: Identifiable, Equatable {
     let progress: Double
 }
 
+struct RouteElevationProbe: Identifiable, Equatable {
+    let id: UUID
+    var progress: Double
+
+    init(id: UUID = UUID(), progress: Double) {
+        self.id = id
+        self.progress = min(1, max(0, progress))
+    }
+}
+
+struct RouteElevationProbeSummary: Identifiable {
+    let id: UUID
+    let label: String
+    let progress: Double
+    let coordinate: CLLocationCoordinate2D
+    let elevationMeters: Double?
+    let distanceAlongMeters: CLLocationDistance
+}
+
 struct MapFocusBounds: Equatable, Sendable {
     let south: Double
     let west: Double
@@ -102,6 +121,7 @@ final class AppState: ObservableObject {
     @Published var selectedOutdoorPoint: OutdoorPointFeature?
     @Published var measurePoints: [CLLocationCoordinate2D] = []
     @Published var routePoints: [CLLocationCoordinate2D] = []
+    @Published var routeElevationProbes: [RouteElevationProbe] = []
     @Published var routeWaypointIndices: Set<Int> = []
     @Published var namedRouteWaypoints: [NamedRouteWaypoint] = []
     @Published var isTracking = false
@@ -297,6 +317,44 @@ final class AppState: ObservableObject {
                 progress: progress
             )
         }
+    }
+
+    var routeElevationProbeSummaries: [RouteElevationProbeSummary] {
+        routeElevationProbes
+            .sorted { $0.progress < $1.progress }
+            .enumerated()
+            .compactMap { index, probe in
+                guard let coordinate = RouteMath.coordinate(at: probe.progress, along: routePoints) else {
+                    return nil
+                }
+                return RouteElevationProbeSummary(
+                    id: probe.id,
+                    label: index == 0 ? "A" : "B",
+                    progress: probe.progress,
+                    coordinate: coordinate,
+                    elevationMeters: RouteMath.elevation(at: probe.progress, in: routeElevationProfile),
+                    distanceAlongMeters: routeDistance * probe.progress
+                )
+            }
+    }
+
+    func selectRouteElevationProbe(at progress: Double) {
+        guard hasActiveRoute, routeElevationProfile.count > 1 else { return }
+        let clamped = min(1, max(0, progress))
+        if routeElevationProbes.count < 2 {
+            routeElevationProbes.append(RouteElevationProbe(progress: clamped))
+        } else {
+            let nearestIndex = routeElevationProbes.indices.min {
+                abs(routeElevationProbes[$0].progress - clamped)
+                    < abs(routeElevationProbes[$1].progress - clamped)
+            } ?? routeElevationProbes.startIndex
+            routeElevationProbes[nearestIndex].progress = clamped
+        }
+        routeElevationProbes.sort { $0.progress < $1.progress }
+    }
+
+    func clearRouteElevationProbes() {
+        routeElevationProbes.removeAll()
     }
 
     func handleMapTap(_ coordinate: CLLocationCoordinate2D) {
@@ -570,6 +628,7 @@ final class AppState: ObservableObject {
         currentRouteID = plan.id
         currentRouteCreatedAt = plan.createdAt
         routePoints = plan.coordinates
+        routeElevationProbes.removeAll()
         currentElevationGainMeters = plan.elevationGainMeters
         currentRouteElevationProfileMeters = plan.elevationProfileMeters
         currentElevationProfileProvider = plan.elevationProfileProvider
@@ -866,6 +925,7 @@ final class AppState: ObservableObject {
         isRouteFitted = false
         routeFitError = nil
         routePoints.removeAll()
+        routeElevationProbes.removeAll()
         routeWaypointIndices.removeAll()
         namedRouteWaypoints.removeAll()
         pins.removeAll()
@@ -1045,6 +1105,7 @@ final class AppState: ObservableObject {
         isFittingRoute = false
         isRouteFitted = false
         routeRevision = UUID()
+        routeElevationProbes.removeAll()
         currentElevationGainMeters = 0
         currentRouteElevationProfileMeters = nil
         currentElevationProfileProvider = nil

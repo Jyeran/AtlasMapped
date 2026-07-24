@@ -143,16 +143,25 @@ struct RouteProgressCard: View {
     }
 
     private var elevationProfile: some View {
-        ElevationProfileView(
-            elevations: elevationChartMode == .profile
-                ? state.routeElevationProfile
-                : RouteMath.cumulativeElevationGain(in: state.routeElevationProfile),
-            mode: $elevationChartMode,
-            progress: state.routeProgress,
-            showsPosition: state.isTracking,
-            isLoading: state.isLoadingElevationProfile,
-            error: state.elevationProfileError
-        )
+        VStack(alignment: .leading, spacing: 7) {
+            ElevationProfileView(
+                elevations: elevationChartMode == .profile
+                    ? state.routeElevationProfile
+                    : RouteMath.cumulativeElevationGain(in: state.routeElevationProfile),
+                mode: $elevationChartMode,
+                progress: state.routeProgress,
+                showsPosition: state.isTracking,
+                isLoading: state.isLoadingElevationProfile,
+                error: state.elevationProfileError,
+                probeProgresses: state.routeElevationProbeSummaries.map(\.progress),
+                onProbeTap: state.selectRouteElevationProbe
+            )
+
+            if !state.routeElevationProbeSummaries.isEmpty {
+                ElevationProbeReadout(compact: true)
+                    .environmentObject(state)
+            }
+        }
         .contentShape(Rectangle())
         .frame(minWidth: 190, idealWidth: 320, maxWidth: .infinity)
     }
@@ -431,6 +440,8 @@ struct ElevationProfileView: View {
     let error: String?
     var waypointMarkers: [ElevationWaypointMarker] = []
     var graphHeight: CGFloat = 48
+    var probeProgresses: [Double] = []
+    var onProbeTap: ((Double) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -525,6 +536,27 @@ struct ElevationProfileView: View {
                             .position(markerPoint)
                     }
 
+                    ForEach(Array(probeProgresses.prefix(2).enumerated()), id: \.offset) { index, probeProgress in
+                        let probePoint = point(at: probeProgress, in: proxy.size)
+                        Path { path in
+                            path.move(to: CGPoint(x: probePoint.x, y: 1))
+                            path.addLine(to: CGPoint(x: probePoint.x, y: proxy.size.height - 1))
+                        }
+                        .stroke(
+                            elevationProbeColor(index),
+                            style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
+                        )
+
+                        Text(index == 0 ? "A" : "B")
+                            .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(width: 19, height: 19)
+                            .background(elevationProbeColor(index), in: Circle())
+                            .overlay(Circle().stroke(.white, lineWidth: 2))
+                            .shadow(color: elevationProbeColor(index).opacity(0.32), radius: 3)
+                            .position(probePoint)
+                    }
+
                     if showsPosition {
                         Circle()
                             .fill(AtlasTheme.trailBlue)
@@ -535,12 +567,21 @@ struct ElevationProfileView: View {
                             .transition(.scale.combined(with: .opacity))
                     }
                 }
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    SpatialTapGesture()
+                        .onEnded { value in
+                            guard !points.isEmpty, proxy.size.width > 0 else { return }
+                            onProbeTap?(min(1, max(0, value.location.x / proxy.size.width)))
+                        }
+                )
             }
             .frame(height: graphHeight)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Route \(mode.accessibilityTitle)")
         .accessibilityValue(showsPosition ? "Current position \(progress.formatted(.percent))" : "Tracking not started")
+        .accessibilityHint("Tap two points to compare elevation and distance along the route")
     }
 
     private func graphPoints(in size: CGSize) -> [CGPoint] {
@@ -576,5 +617,112 @@ struct ElevationProfileView: View {
             x: markerInset + clampedProgress * max(1, size.width - markerInset * 2),
             y: 4 + (1 - normalized) * max(1, size.height - 8)
         )
+    }
+
+    private func elevationProbeColor(_ index: Int) -> Color {
+        index == 0
+            ? Color(red: 0.08, green: 0.48, blue: 0.96)
+            : Color(red: 0.10, green: 0.52, blue: 0.42)
+    }
+}
+
+struct ElevationProbeReadout: View {
+    @EnvironmentObject private var state: AppState
+    let compact: Bool
+
+    private var probes: [RouteElevationProbeSummary] {
+        state.routeElevationProbeSummaries
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: compact ? 8 : 12) {
+                probeItems
+            }
+            VStack(alignment: .leading, spacing: 7) {
+                probeItems
+            }
+        }
+        .font(.system(size: compact ? 10 : 12, weight: .semibold, design: .rounded))
+        .foregroundStyle(AtlasTheme.forest)
+        .padding(compact ? 7 : 10)
+        .background(AtlasTheme.moss.opacity(0.075), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            Button(action: state.clearRouteElevationProbes) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Clear elevation comparison")
+            .offset(x: 5, y: -5)
+        }
+    }
+
+    @ViewBuilder
+    private var probeItems: some View {
+        ForEach(Array(probes.enumerated()), id: \.element.id) { index, probe in
+            HStack(spacing: 5) {
+                Text(probe.label)
+                    .foregroundStyle(.white)
+                    .frame(width: 19, height: 19)
+                    .background(probeColor(index), in: Circle())
+                Text("\(formatDistance(probe.distanceAlongMeters)) · \(formatElevation(probe.elevationMeters))")
+                    .lineLimit(1)
+            }
+        }
+
+        if probes.count == 1 {
+            Text("Tap a second point to compare")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        } else if probes.count == 2 {
+            Divider().frame(height: compact ? 16 : 22)
+            HStack(spacing: 5) {
+                Text("Δ")
+                    .fontWeight(.heavy)
+                    .foregroundStyle(AtlasTheme.orange)
+                Text("\(formatDistance(distanceDifference)) · \(signedElevationDifference)")
+                    .lineLimit(1)
+            }
+            .accessibilityLabel(
+                "Difference \(formatDistance(distanceDifference)), elevation \(signedElevationDifference)"
+            )
+        }
+    }
+
+    private var distanceDifference: Double {
+        guard probes.count == 2 else { return 0 }
+        return probes[1].distanceAlongMeters - probes[0].distanceAlongMeters
+    }
+
+    private var elevationDifference: Double? {
+        guard probes.count == 2,
+              let first = probes[0].elevationMeters,
+              let second = probes[1].elevationMeters else { return nil }
+        return second - first
+    }
+
+    private var signedElevationDifference: String {
+        guard let difference = elevationDifference else { return "—" }
+        let prefix = difference > 0 ? "+" : ""
+        return "\(prefix)\(difference.rounded().formatted()) m"
+    }
+
+    private func formatDistance(_ meters: Double) -> String {
+        Measurement(value: meters, unit: UnitLength.meters)
+            .formatted(.measurement(width: .abbreviated, usage: .road))
+    }
+
+    private func formatElevation(_ meters: Double?) -> String {
+        guard let meters else { return "—" }
+        return "\(meters.rounded().formatted()) m"
+    }
+
+    private func probeColor(_ index: Int) -> Color {
+        index == 0
+            ? Color(red: 0.08, green: 0.48, blue: 0.96)
+            : Color(red: 0.10, green: 0.52, blue: 0.42)
     }
 }

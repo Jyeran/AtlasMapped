@@ -27,6 +27,32 @@ enum RouteMath {
         return result
     }
 
+    static func coordinate(
+        at progress: Double,
+        along coordinates: [CLLocationCoordinate2D]
+    ) -> CLLocationCoordinate2D? {
+        guard let first = coordinates.first else { return nil }
+        guard coordinates.count > 1 else { return first }
+
+        let cumulative = cumulativeDistances(along: coordinates)
+        guard let total = cumulative.last, total > 0 else { return first }
+        let target = min(1, max(0, progress)) * total
+
+        for index in 1..<coordinates.count where cumulative[index] >= target {
+            let segmentStart = cumulative[index - 1]
+            let segmentLength = cumulative[index] - segmentStart
+            let fraction = segmentLength > 0 ? (target - segmentStart) / segmentLength : 0
+            let start = MKMapPoint(coordinates[index - 1])
+            let end = MKMapPoint(coordinates[index])
+            return MKMapPoint(
+                x: start.x + (end.x - start.x) * fraction,
+                y: start.y + (end.y - start.y) * fraction
+            ).coordinate
+        }
+
+        return coordinates.last
+    }
+
     static func elevation(at progress: Double, in profile: [Double]) -> Double? {
         guard profile.count > 1 else { return nil }
         let clamped = min(1, max(0, progress))

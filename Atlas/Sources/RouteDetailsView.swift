@@ -97,25 +97,38 @@ struct RouteDetailsView: View {
     }
 
     private var elevationChart: some View {
-        ElevationProfileView(
-            elevations: elevationChartMode == .profile
-                ? state.routeElevationProfile
-                : RouteMath.cumulativeElevationGain(in: state.routeElevationProfile),
-            mode: $elevationChartMode,
-            progress: state.routeProgress,
-            showsPosition: state.isTracking,
-            isLoading: state.isLoadingElevationProfile,
-            error: state.elevationProfileError,
-            waypointMarkers: state.routeWaypointSummaries.map {
-                ElevationWaypointMarker(
-                    id: $0.id,
-                    sequence: $0.sequence,
-                    progress: $0.progress,
-                    kind: $0.kind
-                )
-            },
-            graphHeight: 112
-        )
+        VStack(alignment: .leading, spacing: 12) {
+            ElevationProfileView(
+                elevations: elevationChartMode == .profile
+                    ? state.routeElevationProfile
+                    : RouteMath.cumulativeElevationGain(in: state.routeElevationProfile),
+                mode: $elevationChartMode,
+                progress: state.routeProgress,
+                showsPosition: state.isTracking,
+                isLoading: state.isLoadingElevationProfile,
+                error: state.elevationProfileError,
+                waypointMarkers: state.routeWaypointSummaries.map {
+                    ElevationWaypointMarker(
+                        id: $0.id,
+                        sequence: $0.sequence,
+                        progress: $0.progress,
+                        kind: $0.kind
+                    )
+                },
+                graphHeight: 112,
+                probeProgresses: state.routeElevationProbeSummaries.map(\.progress),
+                onProbeTap: state.selectRouteElevationProbe
+            )
+
+            if !state.routeElevationProbeSummaries.isEmpty {
+                ElevationProbeReadout(compact: false)
+                    .environmentObject(state)
+            } else {
+                Label("Tap two points on the curve to compare them on the route", systemImage: "hand.tap")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(

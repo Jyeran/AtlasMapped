@@ -257,6 +257,29 @@ struct AtlasMapView {
             if !additions.isEmpty {
                 map.addAnnotations(additions)
             }
+
+            let probeSummaries = owner.state.routeElevationProbeSummaries
+            let desiredProbeIDs = Set(probeSummaries.map(\.id))
+            let existingProbes = map.annotations.compactMap { $0 as? RouteElevationProbeAnnotation }
+            map.removeAnnotations(existingProbes.filter { !desiredProbeIDs.contains($0.id) })
+            let probesByID = Dictionary(uniqueKeysWithValues: existingProbes.map { ($0.id, $0) })
+            for (index, probe) in probeSummaries.enumerated() {
+                if let annotation = probesByID[probe.id] {
+                    annotation.coordinate = probe.coordinate
+                    annotation.label = probe.label
+                    annotation.elevationMeters = probe.elevationMeters
+                    if let view = map.view(for: annotation) as? MKMarkerAnnotationView {
+                        configureElevationProbeView(view, annotation: annotation, index: index)
+                    }
+                } else {
+                    map.addAnnotation(RouteElevationProbeAnnotation(
+                        id: probe.id,
+                        coordinate: probe.coordinate,
+                        label: probe.label,
+                        elevationMeters: probe.elevationMeters
+                    ))
+                }
+            }
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -309,6 +332,15 @@ struct AtlasMapView {
                 view.displayPriority = .required
                 return view
             }
+            if let probe = annotation as? RouteElevationProbeAnnotation {
+                let reuseIdentifier = "atlas-elevation-probe"
+                let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView)
+                    ?? MKMarkerAnnotationView(annotation: probe, reuseIdentifier: reuseIdentifier)
+                view.annotation = probe
+                let index = owner.state.routeElevationProbeSummaries.firstIndex { $0.id == probe.id } ?? 0
+                configureElevationProbeView(view, annotation: probe, index: index)
+                return view
+            }
             guard let waypoint = annotation as? RouteWaypointAnnotation else { return nil }
             let reuseIdentifier = "atlas-route-waypoint"
             let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? RouteWaypointView)
@@ -317,6 +349,20 @@ struct AtlasMapView {
             view.setAppearance(sequence: waypoint.sequence, kind: waypoint.kind)
             view.isDraggable = true
             return view
+        }
+
+        private func configureElevationProbeView(
+            _ view: MKMarkerAnnotationView,
+            annotation: RouteElevationProbeAnnotation,
+            index: Int
+        ) {
+            view.markerTintColor = index == 0
+                ? PlatformColor(red: 0.08, green: 0.48, blue: 0.96, alpha: 1)
+                : PlatformColor(red: 0.10, green: 0.52, blue: 0.42, alpha: 1)
+            view.glyphText = annotation.label
+            view.glyphTintColor = .white
+            view.canShowCallout = false
+            view.displayPriority = .required
         }
 
         func mapView(
@@ -1284,6 +1330,31 @@ final class RouteWaypointAnnotation: NSObject, MKAnnotation {
         self.routePointIndex = routePointIndex
         self.waypointID = waypointID
         self.kind = kind
+    }
+}
+
+final class RouteElevationProbeAnnotation: NSObject, MKAnnotation {
+    let id: UUID
+    @objc dynamic var coordinate: CLLocationCoordinate2D
+    var label: String
+    var elevationMeters: Double?
+    var title: String? { accessibilityDescription }
+
+    var accessibilityDescription: String {
+        guard let elevationMeters else { return "Elevation comparison point \(label)" }
+        return "Elevation comparison point \(label), \(elevationMeters.rounded().formatted()) meters"
+    }
+
+    init(
+        id: UUID,
+        coordinate: CLLocationCoordinate2D,
+        label: String,
+        elevationMeters: Double?
+    ) {
+        self.id = id
+        self.coordinate = coordinate
+        self.label = label
+        self.elevationMeters = elevationMeters
     }
 }
 
