@@ -629,8 +629,14 @@ struct AtlasMapView {
                 baseAlpha = 0.72
                 baseDash = [10, 5]
             }
-            renderer.strokeColor = color.withAlphaComponent(baseAlpha * opacityScale)
-            renderer.lineWidth = baseWidth * zoomScale
+            // Let the USGS ink and contour detail remain primary while trails
+            // read as a useful, integrated overlay rather than a second map.
+            let trailWidthEmphasis: CGFloat = 0.90
+            let trailOpacityEmphasis: CGFloat = 0.92
+            renderer.strokeColor = color.withAlphaComponent(
+                baseAlpha * opacityScale * trailOpacityEmphasis
+            )
+            renderer.lineWidth = baseWidth * zoomScale * trailWidthEmphasis
             renderer.lineDashPattern = baseDash.map { NSNumber(value: Double($0 * zoomScale)) }
             renderer.lineJoin = .round
             renderer.lineCap = .round
