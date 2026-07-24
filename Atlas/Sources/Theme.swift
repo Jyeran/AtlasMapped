@@ -9,6 +9,42 @@ enum AtlasTheme {
     static let panelRadius: CGFloat = 18
 }
 
+enum AtlasUnitSystem: String, Codable, CaseIterable, Identifiable, Sendable {
+    case metric
+    case imperial
+
+    var id: String { rawValue }
+    var title: String { self == .metric ? "Metric" : "Imperial" }
+
+    func distance(_ meters: Double) -> String {
+        let value = self == .metric ? meters / 1_000 : meters / 1_609.344
+        let unit = self == .metric ? "km" : "mi"
+        let digits = abs(value) < 10 ? 2 : (abs(value) < 100 ? 1 : 0)
+        return "\(value.formatted(.number.precision(.fractionLength(0...digits)))) \(unit)"
+    }
+
+    func elevation(_ meters: Double) -> String {
+        if self == .metric {
+            return "\(meters.formatted(.number.precision(.fractionLength(1)))) m"
+        }
+        return "\((meters * 3.28084).formatted(.number.precision(.fractionLength(0)))) ft"
+    }
+
+    func signedElevation(_ meters: Double) -> String {
+        let prefix = meters > 0 ? "+" : ""
+        return prefix + elevation(meters)
+    }
+
+    func pace(secondsPerMile: Double?) -> String {
+        guard let secondsPerMile, secondsPerMile.isFinite, secondsPerMile > 0 else { return "—" }
+        let seconds = self == .metric ? secondsPerMile / 1.609344 : secondsPerMile
+        let total = max(0, Int(seconds.rounded()))
+        let minutes = total / 60
+        let remaining = total % 60
+        return "\(String(format: "%d:%02d", minutes, remaining)) /\(self == .metric ? "km" : "mi")"
+    }
+}
+
 enum AtlasMotion {
     static let quick = Animation.smooth(duration: 0.16)
     static let standard = Animation.smooth(duration: 0.24)

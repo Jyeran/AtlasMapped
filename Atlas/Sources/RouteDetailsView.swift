@@ -82,7 +82,7 @@ struct RouteDetailsView: View {
 
     private var terrainSummary: some View {
         HStack(spacing: 0) {
-            summaryMetric("Distance", value: formatDistance(state.routeDistance))
+            summaryMetric("Distance", value: state.unitSystem.distance(state.routeDistance))
             Divider().frame(height: 38)
             summaryMetric("Total gain", value: elevationGain)
             Divider().frame(height: 38)
@@ -255,7 +255,7 @@ struct RouteDetailsView: View {
     private var elevationGain: String {
         if state.isLoadingElevationProfile { return "Sampling…" }
         guard !state.routeElevationProfile.isEmpty else { return "—" }
-        return formatElevation(state.routeElevationGainMeters)
+        return state.unitSystem.elevation(state.routeElevationGainMeters)
     }
 }
 
@@ -302,9 +302,9 @@ private struct WaypointStatsCard: View {
                     }
 
                 HStack(spacing: 8) {
-                    stat("Elevation", value: waypoint.elevationMeters.map(formatElevation) ?? "—")
-                    stat("Along route", value: formatDistance(waypoint.distanceAlongMeters))
-                    stat("To next", value: waypoint.distanceToNextMeters.map(formatDistance) ?? "Finish")
+                    stat("Elevation", value: waypoint.elevationMeters.map(state.unitSystem.elevation) ?? "—")
+                    stat("Along route", value: state.unitSystem.distance(waypoint.distanceAlongMeters))
+                    stat("To next", value: waypoint.distanceToNextMeters.map(state.unitSystem.distance) ?? "Finish")
                 }
 
                 TextField("Add a waypoint comment…", text: $noteDraft, axis: .vertical)
@@ -408,14 +408,4 @@ private struct WaypointStatsCard: View {
         guard noteDraft != waypoint.note else { return }
         state.setWaypointNote(id: waypoint.id, note: noteDraft)
     }
-}
-
-private func formatDistance(_ meters: Double) -> String {
-    Measurement(value: meters, unit: UnitLength.meters)
-        .formatted(.measurement(width: .abbreviated, usage: .road))
-}
-
-private func formatElevation(_ meters: Double) -> String {
-    Measurement(value: meters.rounded(), unit: UnitLength.meters)
-        .formatted(.measurement(width: .abbreviated, usage: .asProvided))
 }

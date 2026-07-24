@@ -255,16 +255,16 @@ struct RouteProgressCard: View {
     private var trackingPanel: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 14) {
-                metric("Traveled", value: HikeFormatting.distance(state.trackingDistanceMeters))
+                metric("Traveled", value: state.unitSystem.distance(state.trackingDistanceMeters))
                 metric("Active", value: HikeFormatting.duration(state.trackingActiveDuration))
                 metric("Elapsed", value: HikeFormatting.duration(state.trackingElapsedDuration))
-                metric("Pace", value: HikeFormatting.pace(state.trackingPaceSecondsPerMile))
+                metric("Pace", value: state.unitSystem.pace(secondsPerMile: state.trackingPaceSecondsPerMile))
             }
             if state.hikeRecorder.mode == .plannedRoute {
                 HStack(spacing: 14) {
                     metric("Next", value: state.trackingNextWaypointName ?? "Finish")
-                    metric("To next", value: state.trackingNextWaypointRemainingMeters.map(HikeFormatting.distance) ?? "—")
-                    metric("Remaining", value: state.trackingRemainingMeters.map(HikeFormatting.distance) ?? "—")
+                    metric("To next", value: state.trackingNextWaypointRemainingMeters.map(state.unitSystem.distance) ?? "—")
+                    metric("Remaining", value: state.trackingRemainingMeters.map(state.unitSystem.distance) ?? "—")
                     metric("ETA", value: state.trackingETA?.formatted(date: .omitted, time: .shortened) ?? "—")
                 }
                 HStack(spacing: 14) {
@@ -274,7 +274,7 @@ struct RouteProgressCard: View {
                 }
             } else {
                 HStack(spacing: 14) {
-                    metric("Elevation gain", value: HikeFormatting.elevation(state.trackingElevationGainMeters))
+                    metric("Elevation gain", value: state.unitSystem.elevation(state.trackingElevationGainMeters))
                     metric("Splits", value: "\(state.hikeRecorder.splits.filter { $0.kind == .manual }.count)")
                 }
             }
@@ -376,27 +376,23 @@ struct RouteProgressCard: View {
     }
 
     private var routeDistanceLabel: String {
-        Measurement(value: state.routeDistance, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        state.unitSystem.distance(state.routeDistance)
     }
 
     private var elevationGainLabel: String {
         if state.isLoadingElevationProfile { return "Sampling…" }
         guard !state.routeElevationProfile.isEmpty else { return "—" }
-        return Measurement(value: state.routeElevationGainMeters.rounded(), unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .asProvided))
+        return state.unitSystem.elevation(state.routeElevationGainMeters)
     }
 
     private var elevationLabel: String {
         guard let elevation = state.currentRouteElevationMeters else { return "—" }
-        return Measurement(value: elevation.rounded(), unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .asProvided))
+        return state.unitSystem.elevation(elevation)
     }
 
     private var distanceFromRouteLabel: String {
         guard let distance = state.distanceFromRouteMeters else { return "—" }
-        return Measurement(value: distance, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        return state.unitSystem.distance(distance)
     }
 
     private var routeFitAlert: Binding<Bool> {
@@ -794,18 +790,16 @@ struct ElevationProbeReadout: View {
 
     private var signedElevationDifference: String {
         guard let difference = elevationDifference else { return "—" }
-        let prefix = difference > 0 ? "+" : ""
-        return "\(prefix)\(difference.rounded().formatted()) m"
+        return state.unitSystem.signedElevation(difference)
     }
 
     private func formatDistance(_ meters: Double) -> String {
-        Measurement(value: meters, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        state.unitSystem.distance(meters)
     }
 
     private func formatElevation(_ meters: Double?) -> String {
         guard let meters else { return "—" }
-        return "\(meters.rounded().formatted()) m"
+        return state.unitSystem.elevation(meters)
     }
 
     private func probeColor(_ index: Int) -> Color {

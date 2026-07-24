@@ -599,9 +599,7 @@ struct MapSearchView: View {
     }
 
     private func formattedDistance(_ meters: Double) -> String {
-        Measurement(value: meters, unit: UnitLength.meters)
-            .converted(to: .miles)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        state.unitSystem.distance(meters)
     }
 
     private func searchRow(title: String, subtitle: String, symbol: String) -> some View {
@@ -844,20 +842,28 @@ struct CompassElevationBar: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
             Divider().frame(height: compact ? 16 : 18)
-            Image(systemName: "mountain.2.fill")
-                .foregroundStyle(AtlasTheme.forest)
-            Text(Measurement(value: elevation, unit: UnitLength.meters).formatted(.measurement(width: .abbreviated, usage: .asProvided)))
-                .monospacedDigit()
-                .contentTransition(.numericText())
+            Button(action: state.toggleUnitSystem) {
+                HStack(spacing: compact ? 6 : 8) {
+                    Image(systemName: "mountain.2.fill")
+                        .foregroundStyle(AtlasTheme.forest)
+                    Text(state.unitSystem.elevation(elevation))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(AtlasPressButtonStyle())
+            .accessibilityLabel("Elevation \(state.unitSystem.elevation(elevation))")
+            .accessibilityHint("Switch to \(state.unitSystem == .metric ? "imperial" : "metric") units")
         }
         .font(.system(size: compact ? 12 : 13, weight: .medium))
         .padding(.horizontal, compact ? 11 : 15)
         .frame(height: compact ? 42 : 44)
         .atlasPanel()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Heading \(cardinal(heading)), \(Int(heading)) degrees, elevation \(Int(elevation)) meters")
+        .accessibilityElement(children: .contain)
         .animation(AtlasMotion.standard, value: Int(heading.rounded()))
         .animation(AtlasMotion.standard, value: Int(elevation.rounded()))
+        .animation(AtlasMotion.standard, value: state.unitSystem)
     }
 
     private func cardinal(_ degrees: Double) -> String {
@@ -937,7 +943,7 @@ struct MeasurementReadout: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "ruler")
-            Text(Measurement(value: state.measuredDistance, unit: UnitLength.meters).formatted(.measurement(width: .abbreviated, usage: .road)))
+            Text(state.unitSystem.distance(state.measuredDistance))
                 .monospacedDigit().fontWeight(.semibold)
             Button("Clear") { state.clearActiveDrawing() }
                 .font(.caption.weight(.semibold))

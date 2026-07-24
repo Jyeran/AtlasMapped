@@ -136,8 +136,7 @@ struct OutdoorPointDetailsCard: View {
     }
 
     private func elevationLabel(_ meters: Double) -> String {
-        Measurement(value: meters.rounded(), unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .asProvided))
+        state.unitSystem.elevation(meters)
     }
 
     private func coordinate(_ point: OutdoorPointFeature) -> CLLocationCoordinate2D {

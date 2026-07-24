@@ -61,7 +61,7 @@ struct HikeHistoryView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 12) {
-                    Label(HikeFormatting.distance(hike.distanceMeters), systemImage: "figure.walk")
+                    Label(state.unitSystem.distance(hike.distanceMeters), systemImage: "figure.walk")
                     Label(HikeFormatting.duration(hike.activeDuration), systemImage: "timer")
                 }
                 .font(.caption.weight(.semibold))
@@ -138,11 +138,11 @@ struct HikeSummaryView: View {
 
     private var stats: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            summaryMetric("Distance", HikeFormatting.distance(hike.distanceMeters), "figure.walk")
+            summaryMetric("Distance", state.unitSystem.distance(hike.distanceMeters), "figure.walk")
             summaryMetric("Active time", HikeFormatting.duration(hike.activeDuration), "timer")
             summaryMetric("Elapsed", HikeFormatting.duration(hike.elapsedDuration), "clock")
-            summaryMetric("Pace", HikeFormatting.pace(pace), "speedometer")
-            summaryMetric("Elevation gain", HikeFormatting.elevation(hike.elevationGainMeters), "mountain.2.fill")
+            summaryMetric("Pace", state.unitSystem.pace(secondsPerMile: pace), "speedometer")
+            summaryMetric("Elevation gain", state.unitSystem.elevation(hike.elevationGainMeters), "mountain.2.fill")
             summaryMetric("GPS points", "\(hike.samples.count)", "point.3.connected.trianglepath.dotted")
         }
     }
@@ -236,7 +236,7 @@ struct HikeSummaryView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(HikeFormatting.distance(split.distanceMeters))
+                        Text(state.unitSystem.distance(split.distanceMeters))
                         Text(HikeFormatting.duration(split.duration))
                     }
                     .font(.subheadline.monospacedDigit())
@@ -529,16 +529,6 @@ extension HikeTrackMap: NSViewRepresentable {
 #endif
 
 enum HikeFormatting {
-    static func distance(_ meters: Double) -> String {
-        Measurement(value: meters, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
-    }
-
-    static func elevation(_ meters: Double) -> String {
-        Measurement(value: meters.rounded(), unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .asProvided))
-    }
-
     static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         let hours = total / 3_600
@@ -549,8 +539,4 @@ enum HikeFormatting {
             : String(format: "%d:%02d", minutes, remaining)
     }
 
-    static func pace(_ secondsPerMile: Double?) -> String {
-        guard let secondsPerMile, secondsPerMile.isFinite else { return "—" }
-        return "\(duration(secondsPerMile)) /mi"
-    }
 }

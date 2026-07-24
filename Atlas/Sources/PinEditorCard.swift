@@ -222,8 +222,7 @@ struct PinEditorCard: View {
 
     private func elevationLabel(_ pin: RoutePin) -> String {
         if let elevation = pin.elevationMeters {
-            let feet = elevation * 3.28084
-            return "\(elevation.formatted(.number.precision(.fractionLength(0)))) m · \(feet.formatted(.number.precision(.fractionLength(0)))) ft"
+            return state.unitSystem.elevation(elevation)
         }
         return state.isLoadingPinElevation(id: pin.id) ? "Sampling…" : "Unavailable"
     }

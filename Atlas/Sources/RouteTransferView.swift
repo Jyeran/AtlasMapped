@@ -262,8 +262,7 @@ struct RouteTransferView: View {
     }
 
     private func formattedDistance(_ meters: Double) -> String {
-        Measurement(value: meters, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        state.unitSystem.distance(meters)
     }
 
     private func importRoute(_ result: Result<URL, Error>) {

@@ -3,6 +3,36 @@ import XCTest
 @testable import AtlasMapped
 
 final class RouteMathTests: XCTestCase {
+    func testUnitSystemFormatsMetricAndImperialValuesConsistently() {
+        XCTAssertEqual(AtlasUnitSystem.metric.distance(1_500), "1.5 km")
+        XCTAssertEqual(AtlasUnitSystem.imperial.distance(1_609.344), "1 mi")
+        XCTAssertEqual(AtlasUnitSystem.metric.elevation(1_234.56), "1,234.6 m")
+        XCTAssertEqual(AtlasUnitSystem.imperial.elevation(304.8), "1,000 ft")
+        XCTAssertEqual(AtlasUnitSystem.metric.pace(secondsPerMile: 600), "6:13 /km")
+        XCTAssertEqual(AtlasUnitSystem.imperial.pace(secondsPerMile: 600), "10:00 /mi")
+    }
+
+    @MainActor
+    func testElevationUnitTogglePersistsAcrossRelaunch() {
+        let defaults = UserDefaults.standard
+        let key = "atlas.unitSystem.v1"
+        let previous = defaults.string(forKey: key)
+        defer {
+            if let previous {
+                defaults.set(previous, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.removeObject(forKey: key)
+
+        let state = AppState(persistsPreferences: true)
+        XCTAssertEqual(state.unitSystem, .metric)
+        state.toggleUnitSystem()
+        XCTAssertEqual(state.unitSystem, .imperial)
+        XCTAssertEqual(AppState(persistsPreferences: true).unitSystem, .imperial)
+    }
+
     func testOSMTrailClassifierRejectsUrbanPedestrianInfrastructureAndRoadTracks() {
         XCTAssertFalse(OSMTrailClassifier.shouldInclude(tags: [
             "highway": "footway",

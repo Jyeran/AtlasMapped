@@ -354,6 +354,7 @@ struct AtlasMapView {
                     annotation.coordinate = probe.coordinate
                     annotation.label = probe.label
                     annotation.elevationMeters = probe.elevationMeters
+                    annotation.unitSystem = owner.state.unitSystem
                     if let view = map.view(for: annotation) as? MKMarkerAnnotationView {
                         configureElevationProbeView(view, annotation: annotation, index: index)
                     }
@@ -362,7 +363,8 @@ struct AtlasMapView {
                         id: probe.id,
                         coordinate: probe.coordinate,
                         label: probe.label,
-                        elevationMeters: probe.elevationMeters
+                        elevationMeters: probe.elevationMeters,
+                        unitSystem: owner.state.unitSystem
                     ))
                 }
             }
@@ -1581,23 +1583,26 @@ final class RouteElevationProbeAnnotation: NSObject, MKAnnotation {
     @objc dynamic var coordinate: CLLocationCoordinate2D
     var label: String
     var elevationMeters: Double?
+    var unitSystem: AtlasUnitSystem
     var title: String? { accessibilityDescription }
 
     var accessibilityDescription: String {
         guard let elevationMeters else { return "Elevation comparison point \(label)" }
-        return "Elevation comparison point \(label), \(elevationMeters.rounded().formatted()) meters"
+        return "Elevation comparison point \(label), \(unitSystem.elevation(elevationMeters))"
     }
 
     init(
         id: UUID,
         coordinate: CLLocationCoordinate2D,
         label: String,
-        elevationMeters: Double?
+        elevationMeters: Double?,
+        unitSystem: AtlasUnitSystem
     ) {
         self.id = id
         self.coordinate = coordinate
         self.label = label
         self.elevationMeters = elevationMeters
+        self.unitSystem = unitSystem
     }
 }
 

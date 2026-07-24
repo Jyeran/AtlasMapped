@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct AtlasMappedApp: App {
-    @StateObject private var appState = AppState(persistsPins: true)
+    @StateObject private var appState = AppState(persistsPins: true, persistsPreferences: true)
 
     var body: some Scene {
         WindowGroup {

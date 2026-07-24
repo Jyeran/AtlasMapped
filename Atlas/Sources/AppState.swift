@@ -115,6 +115,7 @@ struct StoredMapViewport: Codable, Equatable, Sendable {
 final class AppState: ObservableObject {
     @Published var baseMap: BaseMapStyle = .topographic
     @Published var showTrails = true
+    @Published var unitSystem: AtlasUnitSystem
     @Published var selectedTool: MapTool = .explore
     @Published var pins: [RoutePin] = []
     @Published var selectedPinID: UUID?
@@ -167,7 +168,9 @@ final class AppState: ObservableObject {
     private(set) var annotationRevision = UUID()
     private static let mapViewportDefaultsKey = "atlas.lastMapViewport.v1"
     private static let pinsDefaultsKey = "atlas.savedPins.v1"
+    private static let unitSystemDefaultsKey = "atlas.unitSystem.v1"
     private let persistsPins: Bool
+    private let persistsPreferences: Bool
     private var shouldFocusFirstLocation: Bool
     private struct RouteGeometrySnapshot {
         let points: [CLLocationCoordinate2D]
@@ -180,8 +183,12 @@ final class AppState: ObservableObject {
     private var cachedRouteMetrics: (revision: UUID, cumulative: [CLLocationDistance])?
     private var cachedMeasurementMetrics: (revision: UUID, distance: CLLocationDistance)?
 
-    init(persistsPins: Bool = false) {
+    init(persistsPins: Bool = false, persistsPreferences: Bool = false) {
         self.persistsPins = persistsPins
+        self.persistsPreferences = persistsPreferences
+        unitSystem = persistsPreferences
+            ? AtlasUnitSystem(rawValue: UserDefaults.standard.string(forKey: Self.unitSystemDefaultsKey) ?? "") ?? .metric
+            : .metric
         shouldFocusFirstLocation = Self.storedMapViewport == nil
         if persistsPins {
             pins = Self.loadPersistedPins()
@@ -258,6 +265,13 @@ final class AppState: ObservableObject {
         guard persistsPins,
               let data = try? JSONEncoder.atlas.encode(pins) else { return }
         UserDefaults.standard.set(data, forKey: Self.pinsDefaultsKey)
+    }
+
+    func toggleUnitSystem() {
+        unitSystem = unitSystem == .metric ? .imperial : .metric
+        if persistsPreferences {
+            UserDefaults.standard.set(unitSystem.rawValue, forKey: Self.unitSystemDefaultsKey)
+        }
     }
 
     var measuredDistance: CLLocationDistance {
