@@ -3,6 +3,51 @@ import XCTest
 @testable import AtlasMapped
 
 final class RouteMathTests: XCTestCase {
+    func testOSMTrailClassifierRejectsUrbanPedestrianInfrastructureAndRoadTracks() {
+        XCTAssertFalse(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "footway",
+            "footway": "sidewalk",
+            "surface": "concrete"
+        ]))
+        XCTAssertFalse(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "footway",
+            "footway": "crossing",
+            "crossing": "marked"
+        ]))
+        XCTAssertFalse(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "track",
+            "name": "County Road 18",
+            "surface": "gravel"
+        ]))
+        XCTAssertFalse(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "track",
+            "name": "Forest Road",
+            "motor_vehicle": "yes"
+        ]))
+    }
+
+    func testOSMTrailClassifierKeepsRealHikingGeometry() {
+        XCTAssertTrue(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "path",
+            "surface": "ground"
+        ]))
+        XCTAssertTrue(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "footway",
+            "name": "Mesa Trail",
+            "surface": "compacted"
+        ]))
+        XCTAssertTrue(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "track",
+            "name": "Ridge Trail",
+            "foot": "designated",
+            "surface": "dirt"
+        ]))
+        XCTAssertTrue(OSMTrailClassifier.shouldInclude(tags: [
+            "highway": "bridleway",
+            "surface": "earth"
+        ]))
+    }
+
     func testRepeatedZoomPressesCreateDistinctCommands() {
         XCTAssertNotEqual(MapCommand.zoom(0.55), MapCommand.zoom(0.55))
         XCTAssertNotEqual(MapCommand.zoom(1.8), MapCommand.zoom(1.8))

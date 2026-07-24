@@ -88,6 +88,69 @@ struct TrailMapFeature: Codable, Sendable {
     }
 }
 
+enum OSMTrailClassifier {
+    static func shouldInclude(tags: [String: String]) -> Bool {
+        guard let highway = tags["highway"] else { return false }
+        guard tags["access"] != "private",
+              tags["access"] != "no",
+              tags["area"] != "yes",
+              tags["indoor"] != "yes" else { return false }
+
+        let footway = tags["footway"]?.lowercased()
+        let surface = tags["surface"]?.lowercased()
+        let motorVehicle = tags["motor_vehicle"]?.lowercased()
+        let name = [
+            tags["name"],
+            tags["official_name"],
+            tags["loc_name"]
+        ]
+            .compactMap { $0?.lowercased() }
+            .joined(separator: " ")
+
+        let streetFootway = ["sidewalk", "crossing", "traffic_island", "link"].contains(footway)
+            || tags["crossing"] != nil
+            || tags["sidewalk"] != nil
+        let naturalSurface = [
+            "unpaved", "compacted", "fine_gravel", "gravel", "pebblestone",
+            "dirt", "earth", "ground", "grass", "woodchips", "rock",
+            "stone", "sand"
+        ].contains(surface)
+        let pavedSurface = [
+            "paved", "asphalt", "concrete", "concrete:plates", "paving_stones"
+        ].contains(surface)
+        let trailNamed = ["trail", "path", "greenway", "footpath"].contains {
+            name.contains($0)
+        }
+        let hikingEvidence = tags["sac_scale"] != nil
+            || tags["trail_visibility"] != nil
+            || tags["osmc:symbol"] != nil
+            || tags["route"] == "hiking"
+            || tags["hiking"] == "yes"
+            || tags["foot"] == "designated"
+            || tags["designation"]?.lowercased().contains("footpath") == true
+            || trailNamed
+        let vehicleOriented = ["yes", "designated"].contains(motorVehicle)
+
+        switch highway {
+        case "path", "bridleway":
+            return !streetFootway && !vehicleOriented
+        case "steps":
+            return !streetFootway
+        case "footway":
+            // OSM uses footway for both hiking paths and ordinary urban
+            // pedestrian infrastructure. Keep only outdoor/trail evidence.
+            return !streetFootway
+                && (hikingEvidence || naturalSurface || (!pavedSurface && !name.isEmpty))
+        case "track":
+            // A track is ordinarily a vehicle-width road. Only promote it to
+            // Atlas's trail overlay when OSM explicitly identifies hiking use.
+            return hikingEvidence && !vehicleOriented && !pavedSurface
+        default:
+            return false
+        }
+    }
+}
+
 struct WaterwayMapFeature: Codable, Sendable {
     let id: String
     let name: String?
@@ -471,6 +534,7 @@ actor TrailDataService {
                     tags: tags
                 ))
             } else {
+                guard OSMTrailClassifier.shouldInclude(tags: tags) else { continue }
                 for (index, coordinates) in coordinateLines(from: geometry).enumerated() {
                     trails.append(TrailMapFeature(
                         id: "osm-way-\(osmID)-\(index)",
