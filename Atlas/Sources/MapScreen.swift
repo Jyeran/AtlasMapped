@@ -5,6 +5,7 @@ struct MapScreen: View {
     @EnvironmentObject private var state: AppState
     @State private var mapCommand: MapCommand?
     @State private var showRouteDetails = false
+    @State private var routeDetailsDetent: PresentationDetent = .large
     @State private var showSearch = false
     var isSidebarCollapsed = false
     var onShowSidebar: (() -> Void)?
@@ -77,7 +78,10 @@ struct MapScreen: View {
                     .padding(.bottom, 12)
 
                     if state.hasActiveRoute || state.hasActiveHike {
-                        RouteProgressCard { showRouteDetails = true }
+                        RouteProgressCard {
+                            routeDetailsDetent = .large
+                            showRouteDetails = true
+                        }
                             .padding(.horizontal, 12)
                             .padding(.bottom, 12)
                     }
@@ -115,8 +119,10 @@ struct MapScreen: View {
         .sheet(isPresented: $showRouteDetails) {
             RouteDetailsView()
                 .environmentObject(state)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.medium, .large], selection: $routeDetailsDetent)
                 .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
+                .presentationCornerRadius(28)
         }
         .sheet(isPresented: $showSearch) {
             MapSearchView()

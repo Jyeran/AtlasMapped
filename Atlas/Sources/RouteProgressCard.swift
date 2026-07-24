@@ -5,6 +5,11 @@ struct RouteProgressCard: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var didSave = false
     @State private var elevationChartMode: ElevationChartMode = .profile
+    @GestureState(
+        resetTransaction: Transaction(
+            animation: .interactiveSpring(response: 0.28, dampingFraction: 0.82)
+        )
+    ) private var detailsDrag: CGFloat = 0
     var onExpand: () -> Void = {}
 
     var body: some View {
@@ -19,6 +24,8 @@ struct RouteProgressCard: View {
         .padding(.top, 5)
         .padding(.trailing, 32)
         .atlasPanel()
+        .offset(y: resistedDetailsOffset)
+        .scaleEffect(1 + detailsRevealProgress * 0.008, anchor: .bottom)
         .overlay(alignment: .top) {
             Button(action: onExpand) {
                 VStack(spacing: 2) {
@@ -72,12 +79,28 @@ struct RouteProgressCard: View {
             Text(state.routeFitError ?? "Try drawing closer to a connected mapped trail.")
         }
         .simultaneousGesture(
-            DragGesture(minimumDistance: 18)
+            DragGesture(minimumDistance: 8)
+                .updating($detailsDrag) { value, drag, _ in
+                    guard abs(value.translation.height) > abs(value.translation.width),
+                          value.translation.height < 0 else { return }
+                    drag = value.translation.height
+                }
                 .onEnded { value in
-                    if value.translation.height < -42 { onExpand() }
+                    let isVertical = abs(value.translation.height) > abs(value.translation.width)
+                    let pulledFarEnough = value.translation.height < -32
+                    let flickedUp = value.predictedEndTranslation.height < -72
+                    if isVertical, pulledFarEnough || flickedUp { onExpand() }
                 },
             including: .gesture
         )
+    }
+
+    private var detailsRevealProgress: CGFloat {
+        min(1, max(0, -detailsDrag / 88))
+    }
+
+    private var resistedDetailsOffset: CGFloat {
+        -min(30, pow(-min(0, detailsDrag), 0.72) * 1.2)
     }
 
     private var routeSummary: some View {
