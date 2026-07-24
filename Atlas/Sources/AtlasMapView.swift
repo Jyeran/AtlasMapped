@@ -1607,19 +1607,19 @@ enum TrailRenderSizing {
         ))
     }
 
-    /// Trails intentionally render approximately one zoom layer leaner than
-    /// the prior treatment. The 0.22 exponent changes width by only ~16.5%
-    /// across a full 2× zoom step, avoiding obvious layer-to-layer jumps.
+    /// Keep trails as delicate cartographic ink at every hiking zoom. Trails
+    /// become ~5.4% thinner across each full 2× zoom-in step so close views
+    /// reveal terrain detail instead of turning dashes into heavy route marks.
     static func widthScale(visibleSpan: Double) -> CGFloat {
         let safeSpan = max(visibleSpan, 0.0001)
-        let shiftedZoomLayers = log2(0.055 / safeSpan) - 1
-        let scale = 0.82 * pow(2, shiftedZoomLayers * 0.22)
-        return CGFloat(min(0.88, max(0.34, scale)))
+        let zoomLayers = log2(0.055 / safeSpan)
+        let scale = 0.54 * pow(2, zoomLayers * -0.08)
+        return CGFloat(min(0.66, max(0.38, scale)))
     }
 
     static func opacityScale(widthScale: CGFloat) -> CGFloat {
-        let normalized = min(1, max(0, (widthScale - 0.34) / (0.88 - 0.34)))
-        return 0.70 + 0.18 * normalized
+        let normalized = min(1, max(0, (widthScale - 0.38) / (0.66 - 0.38)))
+        return 0.62 + 0.12 * normalized
     }
 }
 

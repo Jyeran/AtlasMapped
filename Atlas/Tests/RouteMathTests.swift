@@ -31,13 +31,20 @@ final class RouteMathTests: XCTestCase {
         let scales = spans.map(TrailRenderSizing.widthScale)
 
         for pair in zip(scales, scales.dropFirst()) {
-            XCTAssertGreaterThan(pair.1, pair.0)
+            XCTAssertLessThan(pair.1, pair.0)
             XCTAssertLessThanOrEqual(
-                pair.1 / pair.0,
-                1.17,
+                pair.0 / pair.1,
+                1.06,
                 "A full zoom layer should not create a visible trail-width jump"
             )
         }
+    }
+
+    func testTrailWidthCurveRemainsDelicateAtCloseZooms() {
+        XCTAssertLessThanOrEqual(
+            TrailRenderSizing.widthScale(visibleSpan: 0.001),
+            0.40
+        )
     }
 
     func testTrailWidthCurveIsContinuousWithinAZoomGesture() {
