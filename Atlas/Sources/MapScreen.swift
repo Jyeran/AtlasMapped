@@ -148,23 +148,33 @@ struct MapScreen: View {
     }
 
     private var topActionControls: some View {
-        HStack(spacing: usesCompactTopControls ? 7 : 8) {
+        HStack(spacing: usesCompactTopControls ? 5 : 8) {
             topControlButton(symbol: "magnifyingglass", accessibilityLabel: "Search maps and routes") {
                 showSearch = true
             }
 
-            if !state.showLayers {
-                topControlButton(symbol: "square.3.layers.3d", accessibilityLabel: "Layers") {
-                    state.showLayers = true
+            topControlButton(
+                symbol: "point.topleft.down.to.point.bottomright.curvepath",
+                accessibilityLabel: "Route plans"
+            ) {
+                state.showRouteTransfer = true
+            }
+
+            topControlButton(
+                symbol: recordingControlSymbol,
+                accessibilityLabel: recordingControlLabel,
+                isActive: state.hasActiveHike
+            ) {
+                if state.hasActiveHike {
+                    state.isTrackingPaused
+                        ? state.resumeHikeTracking()
+                        : state.pauseHikeTracking()
+                } else {
+                    state.startFreeRecording()
                 }
             }
 
             Menu {
-                if !state.hasActiveHike {
-                    Button { state.startFreeRecording() } label: {
-                        Label("Start recording", systemImage: "record.circle")
-                    }
-                }
                 Button { state.showHikeHistory = true } label: {
                     Label("Hike history", systemImage: "clock.arrow.circlepath")
                 }
@@ -174,13 +184,10 @@ struct MapScreen: View {
                 Button { state.showOfflineMaps = true } label: {
                     Label("Offline maps", systemImage: "arrow.down.to.line")
                 }
-                Button { state.showRouteTransfer = true } label: {
-                    Label("Route plans", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .bold))
-                    .frame(width: usesCompactTopControls ? 42 : 44, height: usesCompactTopControls ? 42 : 44)
+                    .frame(width: topControlSize, height: usesCompactTopControls ? 42 : 44)
             }
             .menuIndicator(.hidden)
             .buttonStyle(AtlasPressButtonStyle())
@@ -192,16 +199,32 @@ struct MapScreen: View {
     private func topControlButton(
         symbol: String,
         accessibilityLabel: String,
+        isActive: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                .frame(width: usesCompactTopControls ? 42 : 44, height: usesCompactTopControls ? 42 : 44)
+                .foregroundStyle(isActive ? AtlasTheme.orange : Color.primary)
+                .frame(width: topControlSize, height: usesCompactTopControls ? 42 : 44)
         }
         .buttonStyle(AtlasPressButtonStyle())
         .atlasPanel()
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var topControlSize: CGFloat {
+        usesCompactTopControls ? 40 : 44
+    }
+
+    private var recordingControlSymbol: String {
+        guard state.hasActiveHike else { return "record.circle" }
+        return state.isTrackingPaused ? "play.fill" : "pause.fill"
+    }
+
+    private var recordingControlLabel: String {
+        guard state.hasActiveHike else { return "Record route" }
+        return state.isTrackingPaused ? "Resume route recording" : "Pause route recording"
     }
 }
 
@@ -832,7 +855,7 @@ struct CompassElevationBar: View {
     }
 
     var body: some View {
-        HStack(spacing: compact ? 7 : 12) {
+        HStack(spacing: compact ? 5 : 12) {
             Image(systemName: "location.north.fill")
                 .rotationEffect(.degrees(-heading))
             Text(cardinal(heading))
@@ -843,7 +866,7 @@ struct CompassElevationBar: View {
                 .contentTransition(.numericText())
             Divider().frame(height: compact ? 16 : 18)
             Button(action: state.toggleUnitSystem) {
-                HStack(spacing: compact ? 6 : 8) {
+                HStack(spacing: compact ? 4 : 8) {
                     Image(systemName: "mountain.2.fill")
                         .foregroundStyle(AtlasTheme.forest)
                     Text(state.unitSystem.elevation(elevation))
@@ -857,7 +880,7 @@ struct CompassElevationBar: View {
             .accessibilityHint("Switch to \(state.unitSystem == .metric ? "imperial" : "metric") units")
         }
         .font(.system(size: compact ? 12 : 13, weight: .medium))
-        .padding(.horizontal, compact ? 11 : 15)
+        .padding(.horizontal, compact ? 9 : 15)
         .frame(height: compact ? 42 : 44)
         .atlasPanel()
         .accessibilityElement(children: .contain)
