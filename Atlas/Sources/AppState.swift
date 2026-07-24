@@ -160,11 +160,14 @@ final class AppState: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
     private var elevationTask: Task<Void, Never>?
     private var routeFitTask: Task<Void, Never>?
+    private var pinElevationTasks: [UUID: Task<Void, Never>] = [:]
     private(set) var routeRevision = UUID()
     private(set) var measurementRevision = UUID()
     private(set) var offlineSelectionRevision = UUID()
     private(set) var annotationRevision = UUID()
     private static let mapViewportDefaultsKey = "atlas.lastMapViewport.v1"
+    private static let pinsDefaultsKey = "atlas.savedPins.v1"
+    private let persistsPins: Bool
     private var shouldFocusFirstLocation: Bool
     private struct RouteGeometrySnapshot {
         let points: [CLLocationCoordinate2D]
@@ -177,8 +180,12 @@ final class AppState: ObservableObject {
     private var cachedRouteMetrics: (revision: UUID, cumulative: [CLLocationDistance])?
     private var cachedMeasurementMetrics: (revision: UUID, distance: CLLocationDistance)?
 
-    init() {
+    init(persistsPins: Bool = false) {
+        self.persistsPins = persistsPins
         shouldFocusFirstLocation = Self.storedMapViewport == nil
+        if persistsPins {
+            pins = Self.loadPersistedPins()
+        }
         location.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
@@ -240,6 +247,17 @@ final class AppState: ObservableObject {
         )
         guard let data = try? JSONEncoder().encode(viewport) else { return }
         UserDefaults.standard.set(data, forKey: Self.mapViewportDefaultsKey)
+    }
+
+    private static func loadPersistedPins() -> [RoutePin] {
+        guard let data = UserDefaults.standard.data(forKey: pinsDefaultsKey) else { return [] }
+        return (try? JSONDecoder.atlas.decode([RoutePin].self, from: data)) ?? []
+    }
+
+    private func persistPins() {
+        guard persistsPins,
+              let data = try? JSONEncoder.atlas.encode(pins) else { return }
+        UserDefaults.standard.set(data, forKey: Self.pinsDefaultsKey)
     }
 
     var measuredDistance: CLLocationDistance {
@@ -413,6 +431,8 @@ final class AppState: ObservableObject {
             pins.append(pin)
             annotationRevision = UUID()
             selectedPinID = pin.id
+            persistPins()
+            refreshPinElevation(id: pin.id)
             persistCurrentRouteIfSaved()
         case .measure:
             selectedPinID = nil
@@ -693,7 +713,13 @@ final class AppState: ObservableObject {
             ?? routeWaypointIndices.sorted().enumerated().map {
                 NamedRouteWaypoint(routePointIndex: $0.element, name: "Waypoint \($0.offset + 1)")
             }
-        pins = plan.pins ?? []
+        if let routePins = plan.pins {
+            pins = Dictionary(
+                (pins + routePins).map { ($0.id, $0) },
+                uniquingKeysWith: { savedPin, _ in savedPin }
+            ).values.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            persistPins()
+        }
         selectedPinID = nil
         routeProgress = 0
         distanceFromRouteMeters = nil
@@ -727,7 +753,6 @@ final class AppState: ObservableObject {
             ),
             NamedRouteWaypoint(routePointIndex: coordinates.index(before: coordinates.endIndex), name: "End")
         ]
-        pins.removeAll()
         annotationRevision = UUID()
         selectedPinID = nil
         routeProgress = 0
@@ -897,7 +922,6 @@ final class AppState: ObservableObject {
         routePoints.removeAll()
         routeWaypointIndices.removeAll()
         namedRouteWaypoints.removeAll()
-        pins.removeAll()
         routeRevision = UUID()
         annotationRevision = UUID()
         currentRouteID = UUID()
@@ -999,7 +1023,6 @@ final class AppState: ObservableObject {
         routeElevationProbes.removeAll()
         routeWaypointIndices.removeAll()
         namedRouteWaypoints.removeAll()
-        pins.removeAll()
         routeRevision = UUID()
         annotationRevision = UUID()
         selectedPinID = nil
@@ -1115,6 +1138,7 @@ final class AppState: ObservableObject {
         guard pins.contains(where: { $0.id == id }) else { return }
         selectedOutdoorPoint = nil
         selectedPinID = id
+        refreshPinElevation(id: id)
     }
 
     func selectOutdoorPoint(_ point: OutdoorPointFeature) {
@@ -1135,6 +1159,7 @@ final class AppState: ObservableObject {
             && namedRouteWaypoints[waypointIndex].sourceID == id.uuidString {
             namedRouteWaypoints[waypointIndex].name = title
         }
+        persistPins()
         persistCurrentRouteIfSaved()
     }
 
@@ -1152,13 +1177,66 @@ final class AppState: ObservableObject {
             && namedRouteWaypoints[waypointIndex].sourceID == id.uuidString {
             namedRouteWaypoints[waypointIndex].note = note.isEmpty ? nil : note
         }
+        persistPins()
         persistCurrentRouteIfSaved()
     }
 
+    func updatePin(
+        id: UUID,
+        title: String,
+        note: String,
+        color: RoutePinColor,
+        symbol: RoutePinSymbol
+    ) {
+        guard let index = pins.firstIndex(where: { $0.id == id }) else { return }
+        let resolvedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        pins[index].title = resolvedTitle.isEmpty ? "Untitled Pin" : resolvedTitle
+        pins[index].note = note
+        pins[index].color = color
+        pins[index].symbol = symbol
+        for waypointIndex in namedRouteWaypoints.indices
+        where namedRouteWaypoints[waypointIndex].resolvedKind == .pin
+            && namedRouteWaypoints[waypointIndex].sourceID == id.uuidString {
+            namedRouteWaypoints[waypointIndex].name = pins[index].title
+            namedRouteWaypoints[waypointIndex].note = note.isEmpty ? nil : note
+        }
+        annotationRevision = UUID()
+        persistPins()
+        persistCurrentRouteIfSaved()
+    }
+
+    func refreshPinElevation(id: UUID) {
+        guard let pin = pins.first(where: { $0.id == id }),
+              pin.elevationMeters == nil,
+              pinElevationTasks[id] == nil else { return }
+        objectWillChange.send()
+        pinElevationTasks[id] = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.objectWillChange.send()
+                self.pinElevationTasks[id] = nil
+            }
+            guard let elevation = try? await self.elevationService.elevation(at: pin.coordinate),
+                  !Task.isCancelled,
+                  let index = self.pins.firstIndex(where: { $0.id == id }) else { return }
+            self.pins[index].elevationMeters = elevation
+            self.annotationRevision = UUID()
+            self.persistPins()
+            self.persistCurrentRouteIfSaved()
+        }
+    }
+
+    func isLoadingPinElevation(id: UUID) -> Bool {
+        pinElevationTasks[id] != nil
+    }
+
     func removePin(id: UUID) {
+        pinElevationTasks[id]?.cancel()
+        pinElevationTasks[id] = nil
         pins.removeAll { $0.id == id }
         annotationRevision = UUID()
         if selectedPinID == id { selectedPinID = nil }
+        persistPins()
         persistCurrentRouteIfSaved()
     }
 

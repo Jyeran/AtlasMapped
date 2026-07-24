@@ -39,6 +39,21 @@ extension RouteWaypointKind {
     }
 }
 
+extension RoutePinColor {
+    var color: Color {
+        switch self {
+        case .blue: AtlasTheme.trailBlue
+        case .orange: AtlasTheme.orange
+        case .forest: AtlasTheme.forest
+        case .red: .red
+        case .purple: .purple
+        case .brown: .brown
+        }
+    }
+
+    var title: String { rawValue.capitalized }
+}
+
 struct AtlasPanelModifier: ViewModifier {
     func body(content: Content) -> some View {
         content

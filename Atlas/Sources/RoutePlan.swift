@@ -86,29 +86,91 @@ struct NamedRouteWaypoint: Codable, Hashable, Identifiable, Sendable {
     var resolvedNote: String { note ?? "" }
 }
 
+enum RoutePinColor: String, Codable, CaseIterable, Identifiable, Sendable {
+    case blue
+    case orange
+    case forest
+    case red
+    case purple
+    case brown
+
+    var id: String { rawValue }
+}
+
+enum RoutePinSymbol: String, Codable, CaseIterable, Identifiable, Sendable {
+    case pin
+    case water
+    case peak
+    case trail
+    case camp
+    case viewpoint
+    case caution
+    case parking
+
+    var id: String { rawValue }
+
+    var systemName: String {
+        switch self {
+        case .pin: "mappin"
+        case .water: "drop.fill"
+        case .peak: "mountain.2.fill"
+        case .trail: "figure.hiking"
+        case .camp: "tent.fill"
+        case .viewpoint: "binoculars.fill"
+        case .caution: "exclamationmark.triangle.fill"
+        case .parking: "car.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .pin: "Pin"
+        case .water: "Water"
+        case .peak: "Peak"
+        case .trail: "Trail"
+        case .camp: "Camp"
+        case .viewpoint: "View"
+        case .caution: "Caution"
+        case .parking: "Parking"
+        }
+    }
+}
+
 struct RoutePin: Codable, Hashable, Identifiable, Sendable {
     var id: UUID
     var latitude: Double
     var longitude: Double
     var title: String
     var note: String
+    var elevationMeters: Double?
+    var color: RoutePinColor?
+    var symbol: RoutePinSymbol?
 
     init(
         id: UUID = UUID(),
         coordinate: CLLocationCoordinate2D,
         title: String,
-        note: String = ""
+        note: String = "",
+        elevationMeters: Double? = nil,
+        color: RoutePinColor = .blue,
+        symbol: RoutePinSymbol = .pin
     ) {
         self.id = id
         latitude = coordinate.latitude
         longitude = coordinate.longitude
         self.title = title
         self.note = note
+        self.elevationMeters = elevationMeters
+        self.color = color
+        self.symbol = symbol
     }
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
+
+    var resolvedColor: RoutePinColor { color ?? .blue }
+    var resolvedSymbol: RoutePinSymbol { symbol ?? .pin }
 }
 
 struct RoutePlan: Codable, Identifiable, Hashable, Sendable {

@@ -571,8 +571,64 @@ final class RouteMathTests: XCTestCase {
         XCTAssertEqual(state.routeWaypointIndices, [0, 2])
         XCTAssertEqual(state.namedRouteWaypoints.first?.name, "Mesa Trailhead")
         XCTAssertEqual(state.namedRouteWaypoints.last?.name, "End")
-        XCTAssertTrue(state.pins.isEmpty)
+        XCTAssertEqual(state.pins.first?.title, "Old pin", "Saved pins should outlive the active route")
         XCTAssertEqual(state.selectedTool, .explore)
+    }
+
+    @MainActor
+    func testPinAppearanceAndElevationRoundTrip() throws {
+        let original = RoutePin(
+            coordinate: .init(latitude: 39.985, longitude: -105.294),
+            title: "Water cache",
+            note: "Reliable in summer",
+            elevationMeters: 2_134,
+            color: .forest,
+            symbol: .water
+        )
+
+        let data = try JSONEncoder.atlas.encode(original)
+        let decoded = try JSONDecoder.atlas.decode(RoutePin.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+        XCTAssertEqual(decoded.resolvedColor, .forest)
+        XCTAssertEqual(decoded.resolvedSymbol, .water)
+        XCTAssertEqual(decoded.elevationMeters, 2_134)
+    }
+
+    @MainActor
+    func testConfirmedPinPersistsAcrossAppStateRelaunch() throws {
+        let defaults = UserDefaults.standard
+        let key = "atlas.savedPins.v1"
+        let previous = defaults.data(forKey: key)
+        defer {
+            if let previous {
+                defaults.set(previous, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.removeObject(forKey: key)
+
+        let firstState = AppState(persistsPins: true)
+        let pin = RoutePin(
+            coordinate: .init(latitude: 39.985, longitude: -105.294),
+            title: "Draft"
+        )
+        firstState.pins = [pin]
+        firstState.updatePin(
+            id: pin.id,
+            title: "Camp",
+            note: "Flat bench",
+            color: .orange,
+            symbol: .camp
+        )
+
+        let relaunchedState = AppState(persistsPins: true)
+        let restored = try XCTUnwrap(relaunchedState.pins.first)
+        XCTAssertEqual(restored.title, "Camp")
+        XCTAssertEqual(restored.note, "Flat bench")
+        XCTAssertEqual(restored.resolvedColor, .orange)
+        XCTAssertEqual(restored.resolvedSymbol, .camp)
     }
 
     @MainActor

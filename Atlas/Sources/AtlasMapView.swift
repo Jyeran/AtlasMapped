@@ -271,11 +271,18 @@ struct AtlasMapView {
                 if let annotation = pinsByID[pin.id] {
                     annotation.coordinate = pin.coordinate
                     annotation.title = pin.title
+                    annotation.color = pin.resolvedColor
+                    annotation.symbol = pin.resolvedSymbol
+                    if let view = map.view(for: annotation) as? MKMarkerAnnotationView {
+                        configurePinView(view, annotation: annotation)
+                    }
                 } else {
                     map.addAnnotation(RoutePinAnnotation(
                         id: pin.id,
                         coordinate: pin.coordinate,
-                        title: pin.title
+                        title: pin.title,
+                        color: pin.resolvedColor,
+                        symbol: pin.resolvedSymbol
                     ))
                 }
             }
@@ -409,10 +416,7 @@ struct AtlasMapView {
                 let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView)
                     ?? MKMarkerAnnotationView(annotation: pin, reuseIdentifier: reuseIdentifier)
                 view.annotation = pin
-                view.markerTintColor = PlatformColor(red: 0.08, green: 0.48, blue: 0.96, alpha: 1)
-                view.glyphText = "•"
-                view.canShowCallout = false
-                view.displayPriority = .required
+                configurePinView(view, annotation: pin)
                 return view
             }
             if let probe = annotation as? RouteElevationProbeAnnotation {
@@ -981,6 +985,26 @@ struct AtlasMapView {
             case .viewpoint: PlatformColor(red: 0.20, green: 0.39, blue: 0.43, alpha: 1)
             case .shelter, .campsite: PlatformColor(red: 0.44, green: 0.34, blue: 0.20, alpha: 1)
             case .water, .spring: PlatformColor(red: 0.08, green: 0.48, blue: 0.76, alpha: 1)
+            }
+        }
+
+        private func configurePinView(_ view: MKMarkerAnnotationView, annotation: RoutePinAnnotation) {
+            view.markerTintColor = pinColor(annotation.color)
+            view.glyphText = nil
+            view.glyphImage = PlatformImage.atlasSymbol(named: annotation.symbol.systemName)
+            view.canShowCallout = false
+            view.collisionMode = .circle
+            view.displayPriority = .required
+        }
+
+        private func pinColor(_ color: RoutePinColor) -> PlatformColor {
+            switch color {
+            case .blue: PlatformColor(red: 0.08, green: 0.48, blue: 0.96, alpha: 1)
+            case .orange: PlatformColor(red: 0.95, green: 0.31, blue: 0.04, alpha: 1)
+            case .forest: PlatformColor(red: 0.10, green: 0.34, blue: 0.20, alpha: 1)
+            case .red: PlatformColor(red: 0.82, green: 0.18, blue: 0.17, alpha: 1)
+            case .purple: PlatformColor(red: 0.47, green: 0.30, blue: 0.68, alpha: 1)
+            case .brown: PlatformColor(red: 0.44, green: 0.34, blue: 0.20, alpha: 1)
             }
         }
 
@@ -1632,10 +1656,20 @@ final class RoutePinAnnotation: NSObject, MKAnnotation {
     let id: UUID
     @objc dynamic var coordinate: CLLocationCoordinate2D
     @objc dynamic var title: String?
+    var color: RoutePinColor
+    var symbol: RoutePinSymbol
 
-    init(id: UUID, coordinate: CLLocationCoordinate2D, title: String) {
+    init(
+        id: UUID,
+        coordinate: CLLocationCoordinate2D,
+        title: String,
+        color: RoutePinColor,
+        symbol: RoutePinSymbol
+    ) {
         self.id = id
         self.coordinate = coordinate
         self.title = title
+        self.color = color
+        self.symbol = symbol
     }
 }
