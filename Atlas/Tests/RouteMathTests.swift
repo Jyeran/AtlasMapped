@@ -47,6 +47,28 @@ final class RouteMathTests: XCTestCase {
         )
     }
 
+    func testMinorTrailsPlateauAcrossTheTwoClosestZoomsOnly() {
+        let closeSpan = 0.001
+        let sharedScale = TrailRenderSizing.widthScale(visibleSpan: closeSpan)
+
+        XCTAssertEqual(
+            TrailRenderSizing.widthScale(visibleSpan: closeSpan, importance: .minor),
+            0.44
+        )
+        XCTAssertEqual(
+            TrailRenderSizing.widthScale(visibleSpan: closeSpan, importance: .standard),
+            sharedScale
+        )
+        XCTAssertEqual(
+            TrailRenderSizing.widthScale(visibleSpan: closeSpan, importance: .major),
+            sharedScale
+        )
+        XCTAssertEqual(
+            TrailRenderSizing.widthScale(visibleSpan: 0.01375, importance: .minor),
+            TrailRenderSizing.widthScale(visibleSpan: 0.01375)
+        )
+    }
+
     func testTrailWidthCurveIsContinuousWithinAZoomGesture() {
         let before = TrailRenderSizing.widthScale(visibleSpan: 0.055)
         let after = TrailRenderSizing.widthScale(visibleSpan: 0.054)

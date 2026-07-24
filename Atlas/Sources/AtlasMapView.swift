@@ -647,8 +647,12 @@ struct AtlasMapView {
             case .forestService:
                 PlatformColor(red: 0.31, green: 0.29, blue: 0.20, alpha: 1)
             }
-            let widthScale = TrailRenderSizing.widthScale(visibleSpan: visibleSpan)
-            let opacityScale = TrailRenderSizing.opacityScale(widthScale: widthScale)
+            let zoomScale = TrailRenderSizing.widthScale(visibleSpan: visibleSpan)
+            let widthScale = TrailRenderSizing.widthScale(
+                visibleSpan: visibleSpan,
+                importance: trail.importance
+            )
+            let opacityScale = TrailRenderSizing.opacityScale(widthScale: zoomScale)
 
             let baseWidth: CGFloat
             let baseAlpha: CGFloat
@@ -1615,6 +1619,17 @@ enum TrailRenderSizing {
         let zoomLayers = log2(0.055 / safeSpan)
         let scale = 0.54 * pow(2, zoomLayers * -0.08)
         return CGFloat(min(0.66, max(0.38, scale)))
+    }
+
+    /// Minor trails reached hairline territory at the final two close zooms.
+    /// Plateau only that hierarchy while leaving standard and major trails on
+    /// the shared curve.
+    static func widthScale(
+        visibleSpan: Double,
+        importance: TrailMapFeature.Importance
+    ) -> CGFloat {
+        let scale = widthScale(visibleSpan: visibleSpan)
+        return importance == .minor ? max(0.44, scale) : scale
     }
 
     static func opacityScale(widthScale: CGFloat) -> CGFloat {
