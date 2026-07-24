@@ -670,8 +670,8 @@ struct AtlasMapView {
         private func applyTrailDataset(_ dataset: TrailMapDataset, on map: MKMapView) {
             clearTrailContent(on: map)
             loadedTrailDataset = dataset
-            loadedTrailsByID = Dictionary(uniqueKeysWithValues: dataset.trails.map { ($0.id, $0) })
-            loadedPointsByID = Dictionary(uniqueKeysWithValues: dataset.points.map { ($0.id, $0) })
+            loadedTrailsByID = TrailFeatureIndex.trailsByID(dataset.trails)
+            loadedPointsByID = TrailFeatureIndex.pointsByID(dataset.points)
 
             var longestNamedTrail: [String: TrailMapFeature] = [:]
             var trailOverlays: [TrailPolyline] = []

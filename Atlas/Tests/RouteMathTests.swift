@@ -306,6 +306,34 @@ final class RouteMathTests: XCTestCase {
         XCTAssertEqual(route.last?.latitude, 39.002)
     }
 
+    func testTrailFeatureIndexMergesDuplicateProviderIDsWithoutCrashing() {
+        let short = TrailMapFeature(
+            id: "shared-provider-id",
+            name: "Short segment",
+            coordinates: [
+                RouteWaypoint(.init(latitude: 39.0, longitude: -105.0)),
+                RouteWaypoint(.init(latitude: 39.001, longitude: -105.0))
+            ],
+            source: .openStreetMap
+        )
+        let long = TrailMapFeature(
+            id: "shared-provider-id",
+            name: "Complete segment",
+            coordinates: [
+                RouteWaypoint(.init(latitude: 39.0, longitude: -105.0)),
+                RouteWaypoint(.init(latitude: 39.001, longitude: -105.0)),
+                RouteWaypoint(.init(latitude: 39.002, longitude: -105.0))
+            ],
+            source: .forestService
+        )
+
+        let index = TrailFeatureIndex.trailsByID([short, long])
+
+        XCTAssertEqual(index.count, 1)
+        XCTAssertEqual(index["shared-provider-id"]?.name, "Complete segment")
+        XCTAssertEqual(index["shared-provider-id"]?.coordinates.count, 3)
+    }
+
     func testFitToTrailFollowsConnectedGeometryInsteadOfSketchShortcut() throws {
         let trail = TrailMapFeature(
             id: "l-shaped-trail",

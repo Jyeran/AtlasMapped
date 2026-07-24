@@ -88,6 +88,24 @@ struct TrailMapFeature: Codable, Sendable {
     }
 }
 
+enum TrailFeatureIndex {
+    static func trailsByID(_ trails: [TrailMapFeature]) -> [String: TrailMapFeature] {
+        Dictionary(
+            trails.map { ($0.id, $0) },
+            uniquingKeysWith: { existing, candidate in
+                candidate.coordinates.count > existing.coordinates.count ? candidate : existing
+            }
+        )
+    }
+
+    static func pointsByID(_ points: [OutdoorPointFeature]) -> [String: OutdoorPointFeature] {
+        Dictionary(
+            points.map { ($0.id, $0) },
+            uniquingKeysWith: { existing, _ in existing }
+        )
+    }
+}
+
 enum OSMTrailClassifier {
     static func shouldInclude(tags: [String: String]) -> Bool {
         guard let highway = tags["highway"] else { return false }
