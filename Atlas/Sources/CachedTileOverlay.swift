@@ -17,26 +17,48 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
     let allowsNetwork: Bool
     let storesNetworkTiles: Bool
     let sourceMaximumZoom: Int?
+    let prefetchRadius: Int
+
+    private let memoryCache = NSCache<NSString, NSData>()
+    private let prefetchRegistry = TilePrefetchRegistry()
+    private lazy var prefetchSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration)
+    }()
 
     init(
         kind: TileKind,
         urlTemplate: String,
         allowsNetwork: Bool = true,
         storesNetworkTiles: Bool = true,
-        sourceMaximumZoom: Int? = nil
+        sourceMaximumZoom: Int? = nil,
+        prefetchRadius: Int = 0
     ) {
         self.kind = kind
         self.allowsNetwork = allowsNetwork
         self.storesNetworkTiles = storesNetworkTiles
         self.sourceMaximumZoom = sourceMaximumZoom
+        self.prefetchRadius = max(0, prefetchRadius)
         super.init(urlTemplate: urlTemplate)
+        memoryCache.countLimit = 384
+        memoryCache.totalCostLimit = 48 * 1_024 * 1_024
     }
 
     override func loadTile(at path: MKTileOverlayPath, result: @escaping (Data?, (any Error)?) -> Void) {
         let resultBox = TileResultBox(result)
         let sourcePath = Self.sourcePath(for: path, maximumZoom: sourceMaximumZoom)
-        let cached = TileCache.fileURL(kind: kind, z: sourcePath.z, x: sourcePath.x, y: sourcePath.y)
+        let key = Self.cacheKey(for: sourcePath)
+        prefetchTiles(around: sourcePath)
+        if let data = memoryCache.object(forKey: key as NSString) {
+            resultBox.call(Self.renderedData(data as Data, sourcePath: sourcePath, requestedPath: path), nil)
+            return
+        }
+        let cached = cacheURL(for: sourcePath)
         if let data = try? Data(contentsOf: cached), !data.isEmpty {
+            storeInMemory(data, key: key)
             resultBox.call(Self.renderedData(data, sourcePath: sourcePath, requestedPath: path), nil)
             return
         }
@@ -46,14 +68,77 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
         }
         let remote = url(forTilePath: sourcePath)
         URLSession.shared.dataTask(with: remote) { data, _, error in
-            if let data, error == nil, self.storesNetworkTiles {
-                try? TileCache.store(data, at: cached)
+            if let data, error == nil {
+                self.storeInMemory(data, key: key)
+                if self.storesNetworkTiles {
+                    try? TileCache.store(data, at: cached)
+                }
             }
             let rendered = data.flatMap {
                 Self.renderedData($0, sourcePath: sourcePath, requestedPath: path)
             }
             resultBox.call(rendered, error)
         }.resume()
+    }
+
+    private func prefetchTiles(around sourcePath: MKTileOverlayPath) {
+        guard allowsNetwork, prefetchRadius > 0 else { return }
+        for path in Self.neighboringPaths(around: sourcePath, radius: prefetchRadius) {
+            let key = Self.cacheKey(for: path)
+            guard memoryCache.object(forKey: key as NSString) == nil else { continue }
+            let cached = cacheURL(for: path)
+            if let data = try? Data(contentsOf: cached), !data.isEmpty {
+                storeInMemory(data, key: key)
+                continue
+            }
+            guard prefetchRegistry.begin(key) else { continue }
+            prefetchSession.dataTask(with: url(forTilePath: path)) { [weak self] data, _, _ in
+                guard let self else { return }
+                defer { self.prefetchRegistry.finish(key) }
+                guard let data, !data.isEmpty else { return }
+                self.storeInMemory(data, key: key)
+                if self.storesNetworkTiles {
+                    try? TileCache.store(data, at: cached)
+                }
+            }.resume()
+        }
+    }
+
+    private func cacheURL(for path: MKTileOverlayPath) -> URL {
+        TileCache.fileURL(kind: kind, z: path.z, x: path.x, y: path.y)
+    }
+
+    private func storeInMemory(_ data: Data, key: String) {
+        memoryCache.setObject(data as NSData, forKey: key as NSString, cost: data.count)
+    }
+
+    static func cacheKey(for path: MKTileOverlayPath) -> String {
+        "\(path.z)/\(path.x)/\(path.y)@\(path.contentScaleFactor)"
+    }
+
+    static func neighboringPaths(
+        around path: MKTileOverlayPath,
+        radius: Int
+    ) -> [MKTileOverlayPath] {
+        guard radius > 0, path.z >= 0, path.z < Int.bitWidth - 1 else { return [] }
+        let tileCount = 1 << path.z
+        var neighbors: [MKTileOverlayPath] = []
+        neighbors.reserveCapacity((radius * 2 + 1) * (radius * 2 + 1) - 1)
+        for yOffset in -radius...radius {
+            let y = path.y + yOffset
+            guard (0..<tileCount).contains(y) else { continue }
+            for xOffset in -radius...radius where xOffset != 0 || yOffset != 0 {
+                let unwrappedX = path.x + xOffset
+                let x = (unwrappedX % tileCount + tileCount) % tileCount
+                neighbors.append(MKTileOverlayPath(
+                    x: x,
+                    y: y,
+                    z: path.z,
+                    contentScaleFactor: path.contentScaleFactor
+                ))
+            }
+        }
+        return neighbors
     }
 
     static func sourcePath(
@@ -127,6 +212,23 @@ private final class TileResultBox: @unchecked Sendable {
     private let callback: (Data?, (any Error)?) -> Void
     init(_ callback: @escaping (Data?, (any Error)?) -> Void) { self.callback = callback }
     func call(_ data: Data?, _ error: (any Error)?) { callback(data, error) }
+}
+
+private final class TilePrefetchRegistry: @unchecked Sendable {
+    private let lock = NSLock()
+    private var activeKeys = Set<String>()
+
+    func begin(_ key: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return activeKeys.insert(key).inserted
+    }
+
+    func finish(_ key: String) {
+        lock.lock()
+        activeKeys.remove(key)
+        lock.unlock()
+    }
 }
 
 enum TileCache {

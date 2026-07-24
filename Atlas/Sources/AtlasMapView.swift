@@ -118,7 +118,8 @@ struct AtlasMapView {
                 urlTemplate: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
                 allowsNetwork: allowsNetwork,
                 storesNetworkTiles: false,
-                sourceMaximumZoom: 16
+                sourceMaximumZoom: 16,
+                prefetchRadius: 2
             )
             topo.canReplaceMapContent = true
             topo.minimumZ = 0

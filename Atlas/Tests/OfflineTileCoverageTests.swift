@@ -46,6 +46,28 @@ final class OfflineTileCoverageTests: XCTestCase {
         XCTAssertEqual(source.y, requested.y)
     }
 
+    func testTilePrefetchBuildsATwoTileApronWithoutRepeatingCenter() {
+        let center = MKTileOverlayPath(x: 8, y: 8, z: 4, contentScaleFactor: 2)
+
+        let neighbors = CachedTileOverlay.neighboringPaths(around: center, radius: 2)
+
+        XCTAssertEqual(neighbors.count, 24)
+        XCTAssertFalse(neighbors.contains { $0.x == center.x && $0.y == center.y })
+        XCTAssertTrue(neighbors.contains { $0.x == 6 && $0.y == 6 })
+        XCTAssertTrue(neighbors.contains { $0.x == 10 && $0.y == 10 })
+        XCTAssertTrue(neighbors.allSatisfy { $0.z == center.z && $0.contentScaleFactor == 2 })
+    }
+
+    func testTilePrefetchWrapsLongitudeAndClampsAtPoles() {
+        let corner = MKTileOverlayPath(x: 0, y: 0, z: 2, contentScaleFactor: 1)
+
+        let neighbors = CachedTileOverlay.neighboringPaths(around: corner, radius: 1)
+
+        XCTAssertEqual(Set(neighbors.map(\.y)), [0, 1])
+        XCTAssertTrue(neighbors.contains { $0.x == 3 && $0.y == 0 })
+        XCTAssertFalse(neighbors.contains { $0.y < 0 })
+    }
+
     func testTileAddressClampsAndRoundTripsThroughCodable() throws {
         let tile = OfflineTile(z: 2, x: -5, y: 99)
         XCTAssertEqual(tile, OfflineTile(z: 2, x: 0, y: 3))
