@@ -2,6 +2,9 @@ import SwiftUI
 
 struct LayerPanel: View {
     @EnvironmentObject private var state: AppState
+    private let usgsURL = URL(string: "https://www.usgs.gov/programs/national-geospatial-program/national-map")!
+    private let openStreetMapURL = URL(string: "https://www.openstreetmap.org/copyright")!
+    private let forestServiceURL = URL(string: "https://data.fs.usda.gov/geodata/edw/datasets.php")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -39,6 +42,23 @@ struct LayerPanel: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 10)
                 .padding(.top, 2)
+
+            Divider().padding(.vertical, 3)
+
+            Menu {
+                Link("USGS Topographic Map", destination: usgsURL)
+                Link("OpenStreetMap attribution", destination: openStreetMapURL)
+                Link("USDA Forest Service data", destination: forestServiceURL)
+            } label: {
+                Label("Map data & credits", systemImage: "info.circle")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .frame(height: 32)
+                    .contentShape(Rectangle())
+            }
+            .menuIndicator(.hidden)
         }
         .padding(14)
         .frame(width: 248)

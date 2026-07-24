@@ -3,6 +3,29 @@ import XCTest
 @testable import AtlasMapped
 
 final class RouteMathTests: XCTestCase {
+    func testMapScaleUsesNiceMetricDistances() {
+        let scale = MapScaleSizing.measurement(
+            metersPerScreenPoint: 13,
+            maximumWidth: 96,
+            unitSystem: .metric
+        )
+
+        XCTAssertEqual(scale?.distanceMeters, 1_000)
+        XCTAssertEqual(scale?.label, "1 km")
+        XCTAssertEqual(scale?.width ?? 0, 76.923, accuracy: 0.01)
+    }
+
+    func testMapScaleFollowsAppWideImperialUnits() {
+        let scale = MapScaleSizing.measurement(
+            metersPerScreenPoint: 20,
+            maximumWidth: 96,
+            unitSystem: .imperial
+        )
+
+        XCTAssertEqual(scale?.label, "1 mi")
+        XCTAssertEqual(scale?.distanceMeters ?? 0, 1_609.344, accuracy: 0.001)
+    }
+
     func testTrailWidthCurveChangesSmoothlyAcrossZoomLayers() {
         let spans = [0.44, 0.22, 0.11, 0.055, 0.0275, 0.01375]
         let scales = spans.map(TrailRenderSizing.widthScale)

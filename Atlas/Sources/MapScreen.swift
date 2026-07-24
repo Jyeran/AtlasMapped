@@ -7,6 +7,7 @@ struct MapScreen: View {
     @State private var showRouteDetails = false
     @State private var routeDetailsDetent: PresentationDetent = .large
     @State private var showSearch = false
+    @State private var metersPerScreenPoint = 0.0
     var isSidebarCollapsed = false
     var onShowSidebar: (() -> Void)?
 
@@ -24,7 +25,10 @@ struct MapScreen: View {
         ZStack {
             // One renderer and one visual source on every device: USGS Topo
             // raster tiles, with Atlas's interactive trail data above them.
-            AtlasMapView(command: $mapCommand)
+            AtlasMapView(
+                command: $mapCommand,
+                metersPerScreenPoint: $metersPerScreenPoint
+            )
             .ignoresSafeArea()
 
             if state.isSelectingOfflineArea {
@@ -74,7 +78,7 @@ struct MapScreen: View {
                                 MeasurementReadout()
                                     .transition(.move(edge: .leading).combined(with: .opacity))
                             }
-                            MapAttributionBadge()
+                            MapScaleBar(metersPerScreenPoint: metersPerScreenPoint)
                         }
                         Spacer()
                         ToolRail(command: $mapCommand)
@@ -669,41 +673,107 @@ private extension KnownOutdoorSearchHit.Kind {
     }
 }
 
-struct MapAttributionBadge: View {
+struct MapScaleBar: View {
     @EnvironmentObject private var state: AppState
+    let metersPerScreenPoint: Double
 
-    private let openStreetMapURL = URL(string: "https://www.openstreetmap.org/copyright")!
-    private let forestServiceURL = URL(string: "https://data.fs.usda.gov/geodata/edw/datasets.php")!
-    private let usgsURL = URL(string: "https://www.usgs.gov/programs/national-geospatial-program/national-map")!
+    private var measurement: MapScaleSizing.Measurement? {
+        MapScaleSizing.measurement(
+            metersPerScreenPoint: metersPerScreenPoint,
+            maximumWidth: 96,
+            unitSystem: state.unitSystem
+        )
+    }
 
     var body: some View {
-        HStack(spacing: 5) {
-            Link("USGS The National Map", destination: usgsURL)
-                .lineLimit(1)
+        if let measurement {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(measurement.label)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
 
-            Menu {
-                Link("USGS Topographic Map", destination: usgsURL)
-                Link("OpenStreetMap attribution", destination: openStreetMapURL)
-                if state.showTrails {
-                    Link("USDA Forest Service trails", destination: forestServiceURL)
+                ZStack(alignment: .bottom) {
+                    Rectangle()
+                        .frame(height: 1.5)
+                    HStack {
+                        Rectangle().frame(width: 1.5, height: 5)
+                        Spacer(minLength: 0)
+                        Rectangle().frame(width: 1.5, height: 5)
+                    }
                 }
-            } label: {
-                Image(systemName: "info.circle")
-                    .imageScale(.small)
-                    .frame(width: 18, height: 18)
-                    .contentShape(Rectangle())
+                .frame(width: measurement.width, height: 5)
             }
-            .menuIndicator(.hidden)
-            .accessibilityLabel("Map data sources")
+            .foregroundStyle(AtlasTheme.forest.opacity(0.82))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .animation(AtlasMotion.quick, value: measurement.width)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Map scale, \(measurement.label)")
         }
-        .font(.system(size: 9, weight: .medium))
-        .foregroundStyle(.secondary)
-        .padding(.leading, 8)
-        .padding(.trailing, 5)
-        .padding(.vertical, 3)
-        .background(.thinMaterial, in: Capsule())
-        .fixedSize(horizontal: true, vertical: true)
-        .accessibilityElement(children: .contain)
+    }
+}
+
+enum MapScaleSizing {
+    struct Measurement: Equatable {
+        let distanceMeters: Double
+        let width: CGFloat
+        let label: String
+    }
+
+    static func measurement(
+        metersPerScreenPoint: Double,
+        maximumWidth: CGFloat,
+        unitSystem: AtlasUnitSystem
+    ) -> Measurement? {
+        guard metersPerScreenPoint.isFinite,
+              metersPerScreenPoint > 0,
+              maximumWidth > 0 else { return nil }
+
+        let availableMeters = metersPerScreenPoint * maximumWidth
+        let distanceMeters: Double
+        let label: String
+
+        switch unitSystem {
+        case .metric:
+            let niceMeters = niceValue(notExceeding: availableMeters)
+            distanceMeters = niceMeters
+            if niceMeters >= 1_000 {
+                label = formatted(niceMeters / 1_000) + " km"
+            } else {
+                label = formatted(niceMeters) + " m"
+            }
+        case .imperial:
+            let availableFeet = availableMeters * 3.28084
+            if availableFeet < 5_280 {
+                let niceFeet = niceValue(notExceeding: availableFeet)
+                distanceMeters = niceFeet / 3.28084
+                label = formatted(niceFeet) + " ft"
+            } else {
+                let niceMiles = niceValue(notExceeding: availableMeters / 1_609.344)
+                distanceMeters = niceMiles * 1_609.344
+                label = formatted(niceMiles) + " mi"
+            }
+        }
+
+        return Measurement(
+            distanceMeters: distanceMeters,
+            width: maximumWidth * CGFloat(distanceMeters / availableMeters),
+            label: label
+        )
+    }
+
+    private static func niceValue(notExceeding value: Double) -> Double {
+        guard value > 0 else { return 0 }
+        let magnitude = pow(10, floor(log10(value)))
+        let normalized = value / magnitude
+        let coefficient = normalized >= 5 ? 5.0 : (normalized >= 2 ? 2.0 : 1.0)
+        return coefficient * magnitude
+    }
+
+    private static func formatted(_ value: Double) -> String {
+        let digits = value < 1 ? 1 : 0
+        return value.formatted(.number.precision(.fractionLength(0...digits)))
     }
 }
 

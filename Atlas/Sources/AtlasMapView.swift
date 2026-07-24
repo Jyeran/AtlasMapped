@@ -5,13 +5,14 @@ import SwiftUI
 struct AtlasMapView {
     @EnvironmentObject private var state: AppState
     @Binding var command: MapCommand?
+    @Binding var metersPerScreenPoint: Double
 
     fileprivate func makeMap(context: Context) -> MKMapView {
         let map = MKMapView(frame: .zero)
         map.delegate = context.coordinator
         map.showsUserLocation = true
         map.showsCompass = false
-        map.showsScale = true
+        map.showsScale = false
         map.pointOfInterestFilter = .excludingAll
         map.setCameraZoomRange(
             MKMapView.CameraZoomRange(
@@ -90,6 +91,7 @@ struct AtlasMapView {
         private var loadedPointsByID: [String: OutdoorPointFeature] = [:]
         private var hasObservedInitialRegion = false
         private var lastStyledTrailSpan: Double?
+        private var lastReportedMetersPerPoint: Double?
         private var lassoCoordinates: [CLLocationCoordinate2D] = []
         private var lastDrawingStrokePoint: CGPoint?
         private var headingConeAnnotation: HeadingConeAnnotation?
@@ -571,6 +573,7 @@ struct AtlasMapView {
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            updateMapScale(on: mapView, force: true)
             if hasObservedInitialRegion {
                 owner.state.storeMapViewport(mapView.region)
             } else {
@@ -585,8 +588,25 @@ struct AtlasMapView {
         }
 
         func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
-            guard appliedTrails else { return }
-            updateTrailRendererScale(on: mapView)
+            updateMapScale(on: mapView)
+            if appliedTrails {
+                updateTrailRendererScale(on: mapView)
+            }
+        }
+
+        func updateMapScale(on map: MKMapView, force: Bool = false) {
+            guard map.bounds.width > 0 else { return }
+            let metersPerPoint = map.visibleMapRect.size.width
+                * MKMetersPerMapPointAtLatitude(map.centerCoordinate.latitude)
+                / map.bounds.width
+            guard metersPerPoint.isFinite, metersPerPoint > 0 else { return }
+            if !force,
+               let lastReportedMetersPerPoint,
+               abs(log(metersPerPoint / lastReportedMetersPerPoint)) < 0.012 {
+                return
+            }
+            lastReportedMetersPerPoint = metersPerPoint
+            owner.metersPerScreenPoint = metersPerPoint
         }
 
         private func updateTrailRendererScale(on map: MKMapView, force: Bool = false) {
