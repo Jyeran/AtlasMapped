@@ -119,7 +119,8 @@ struct AtlasMapView {
                 allowsNetwork: allowsNetwork,
                 storesNetworkTiles: false,
                 sourceMaximumZoom: 16,
-                prefetchRadius: 2
+                prefetchRadius: 3,
+                prefetchesAdjacentZoomLevels: true
             )
             topo.canReplaceMapContent = true
             topo.minimumZ = 0

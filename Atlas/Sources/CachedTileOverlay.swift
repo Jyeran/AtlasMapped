@@ -18,6 +18,7 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
     let storesNetworkTiles: Bool
     let sourceMaximumZoom: Int?
     let prefetchRadius: Int
+    let prefetchesAdjacentZoomLevels: Bool
 
     private let memoryCache = NSCache<NSString, NSData>()
     private let prefetchRegistry = TilePrefetchRegistry()
@@ -35,13 +36,15 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
         allowsNetwork: Bool = true,
         storesNetworkTiles: Bool = true,
         sourceMaximumZoom: Int? = nil,
-        prefetchRadius: Int = 0
+        prefetchRadius: Int = 0,
+        prefetchesAdjacentZoomLevels: Bool = false
     ) {
         self.kind = kind
         self.allowsNetwork = allowsNetwork
         self.storesNetworkTiles = storesNetworkTiles
         self.sourceMaximumZoom = sourceMaximumZoom
         self.prefetchRadius = max(0, prefetchRadius)
+        self.prefetchesAdjacentZoomLevels = prefetchesAdjacentZoomLevels
         super.init(urlTemplate: urlTemplate)
         memoryCache.countLimit = 384
         memoryCache.totalCostLimit = 48 * 1_024 * 1_024
@@ -82,8 +85,15 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
     }
 
     private func prefetchTiles(around sourcePath: MKTileOverlayPath) {
-        guard allowsNetwork, prefetchRadius > 0 else { return }
-        for path in Self.neighboringPaths(around: sourcePath, radius: prefetchRadius) {
+        guard allowsNetwork,
+              prefetchRadius > 0 || prefetchesAdjacentZoomLevels else { return }
+        let paths = Self.prefetchPaths(
+            around: sourcePath,
+            radius: prefetchRadius,
+            maximumZoom: sourceMaximumZoom,
+            includesAdjacentZoomLevels: prefetchesAdjacentZoomLevels
+        )
+        for path in paths {
             let key = Self.cacheKey(for: path)
             guard memoryCache.object(forKey: key as NSString) == nil else { continue }
             let cached = cacheURL(for: path)
@@ -92,7 +102,7 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
                 continue
             }
             guard prefetchRegistry.begin(key) else { continue }
-            prefetchSession.dataTask(with: url(forTilePath: path)) { [weak self] data, _, _ in
+            let task = prefetchSession.dataTask(with: url(forTilePath: path)) { [weak self] data, _, _ in
                 guard let self else { return }
                 defer { self.prefetchRegistry.finish(key) }
                 guard let data, !data.isEmpty else { return }
@@ -100,7 +110,9 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
                 if self.storesNetworkTiles {
                     try? TileCache.store(data, at: cached)
                 }
-            }.resume()
+            }
+            task.priority = URLSessionTask.lowPriority
+            task.resume()
         }
     }
 
@@ -122,23 +134,74 @@ final class CachedTileOverlay: MKTileOverlay, @unchecked Sendable {
     ) -> [MKTileOverlayPath] {
         guard radius > 0, path.z >= 0, path.z < Int.bitWidth - 1 else { return [] }
         let tileCount = 1 << path.z
-        var neighbors: [MKTileOverlayPath] = []
-        neighbors.reserveCapacity((radius * 2 + 1) * (radius * 2 + 1) - 1)
-        for yOffset in -radius...radius {
-            let y = path.y + yOffset
-            guard (0..<tileCount).contains(y) else { continue }
-            for xOffset in -radius...radius where xOffset != 0 || yOffset != 0 {
-                let unwrappedX = path.x + xOffset
-                let x = (unwrappedX % tileCount + tileCount) % tileCount
-                neighbors.append(MKTileOverlayPath(
-                    x: x,
-                    y: y,
-                    z: path.z,
-                    contentScaleFactor: path.contentScaleFactor
-                ))
+        let offsets = (-radius...radius).flatMap { yOffset in
+            (-radius...radius).compactMap { xOffset -> (x: Int, y: Int)? in
+                guard xOffset != 0 || yOffset != 0 else { return nil }
+                return (xOffset, yOffset)
             }
+        }.sorted { lhs, rhs in
+            let lhsRing = max(abs(lhs.x), abs(lhs.y))
+            let rhsRing = max(abs(rhs.x), abs(rhs.y))
+            if lhsRing != rhsRing { return lhsRing < rhsRing }
+            let lhsDistance = lhs.x * lhs.x + lhs.y * lhs.y
+            let rhsDistance = rhs.x * rhs.x + rhs.y * rhs.y
+            return lhsDistance < rhsDistance
+        }
+        var neighbors: [MKTileOverlayPath] = []
+        neighbors.reserveCapacity(offsets.count)
+        for offset in offsets {
+            let y = path.y + offset.y
+            guard (0..<tileCount).contains(y) else { continue }
+            let unwrappedX = path.x + offset.x
+            let x = (unwrappedX % tileCount + tileCount) % tileCount
+            neighbors.append(MKTileOverlayPath(
+                x: x,
+                y: y,
+                z: path.z,
+                contentScaleFactor: path.contentScaleFactor
+            ))
         }
         return neighbors
+    }
+
+    static func prefetchPaths(
+        around path: MKTileOverlayPath,
+        radius: Int,
+        maximumZoom: Int?,
+        includesAdjacentZoomLevels: Bool
+    ) -> [MKTileOverlayPath] {
+        let neighbors = neighboringPaths(around: path, radius: radius)
+        guard includesAdjacentZoomLevels else { return neighbors }
+
+        var zoomPaths: [MKTileOverlayPath] = []
+        if path.z > 0 {
+            zoomPaths.append(MKTileOverlayPath(
+                x: path.x >> 1,
+                y: path.y >> 1,
+                z: path.z - 1,
+                contentScaleFactor: path.contentScaleFactor
+            ))
+        }
+        let maximumNativeZoom = maximumZoom ?? Int.max
+        if path.z < maximumNativeZoom, path.z < Int.bitWidth - 2 {
+            for yOffset in 0...1 {
+                for xOffset in 0...1 {
+                    zoomPaths.append(MKTileOverlayPath(
+                        x: path.x * 2 + xOffset,
+                        y: path.y * 2 + yOffset,
+                        z: path.z + 1,
+                        contentScaleFactor: path.contentScaleFactor
+                    ))
+                }
+            }
+        }
+
+        // Fill the nearest pan ring first, then warm zoom changes before
+        // spending bandwidth on the more distant edge of the apron.
+        let immediateCount = min(8, neighbors.count)
+        return Array(neighbors.prefix(immediateCount))
+            + zoomPaths
+            + Array(neighbors.dropFirst(immediateCount))
     }
 
     static func sourcePath(

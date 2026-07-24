@@ -95,6 +95,36 @@ final class OfflineTileCoverageTests: XCTestCase {
         XCTAssertFalse(neighbors.contains { $0.y < 0 })
     }
 
+    func testTilePrefetchWarmsParentAndChildrenForSmoothZooming() {
+        let center = MKTileOverlayPath(x: 8, y: 10, z: 4, contentScaleFactor: 2)
+
+        let paths = CachedTileOverlay.prefetchPaths(
+            around: center,
+            radius: 1,
+            maximumZoom: 16,
+            includesAdjacentZoomLevels: true
+        )
+
+        XCTAssertTrue(paths.contains { $0.z == 3 && $0.x == 4 && $0.y == 5 })
+        XCTAssertEqual(paths.filter { $0.z == 5 }.count, 4)
+        XCTAssertTrue(paths.contains { $0.z == 5 && $0.x == 16 && $0.y == 20 })
+        XCTAssertTrue(paths.contains { $0.z == 5 && $0.x == 17 && $0.y == 21 })
+    }
+
+    func testTilePrefetchDoesNotRequestChildrenPastNativeMaximumZoom() {
+        let center = MKTileOverlayPath(x: 32_000, y: 24_000, z: 16, contentScaleFactor: 1)
+
+        let paths = CachedTileOverlay.prefetchPaths(
+            around: center,
+            radius: 0,
+            maximumZoom: 16,
+            includesAdjacentZoomLevels: true
+        )
+
+        XCTAssertTrue(paths.contains { $0.z == 15 })
+        XCTAssertFalse(paths.contains { $0.z > 16 })
+    }
+
     func testTileAddressClampsAndRoundTripsThroughCodable() throws {
         let tile = OfflineTile(z: 2, x: -5, y: 99)
         XCTAssertEqual(tile, OfflineTile(z: 2, x: 0, y: 3))
