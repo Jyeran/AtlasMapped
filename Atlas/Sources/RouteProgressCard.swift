@@ -638,26 +638,34 @@ struct ElevationProbeReadout: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: compact ? 8 : 12) {
                 probeItems
+                clearButton
             }
             VStack(alignment: .leading, spacing: 7) {
                 probeItems
+                HStack {
+                    Spacer()
+                    clearButton
+                }
             }
         }
         .font(.system(size: compact ? 10 : 12, weight: .semibold, design: .rounded))
         .foregroundStyle(AtlasTheme.forest)
         .padding(compact ? 7 : 10)
         .background(AtlasTheme.moss.opacity(0.075), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            Button(action: state.clearRouteElevationProbes) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .accessibilityLabel("Clear elevation comparison")
-            .offset(x: 5, y: -5)
+    }
+
+    private var clearButton: some View {
+        Button(action: state.clearRouteElevationProbes) {
+            Label("Clear", systemImage: "xmark")
+                .font(.system(size: compact ? 10 : 11, weight: .bold, design: .rounded))
+                .padding(.horizontal, compact ? 10 : 12)
+                .frame(minHeight: compact ? 32 : 36)
+                .contentShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .foregroundStyle(AtlasTheme.forest)
+        .background(AtlasTheme.moss.opacity(0.13), in: Capsule())
+        .accessibilityLabel("Clear elevation comparison")
     }
 
     @ViewBuilder
