@@ -260,9 +260,18 @@ struct RouteDetailsView: View {
 
 private struct WaypointStatsCard: View {
     @EnvironmentObject private var state: AppState
-    @FocusState private var isEditingName: Bool
+    private enum FocusedField { case name, note }
+    @FocusState private var focusedField: FocusedField?
     @State private var showRemoveConfirmation = false
+    @State private var nameDraft: String
+    @State private var noteDraft: String
     let waypoint: RouteWaypointSummary
+
+    init(waypoint: RouteWaypointSummary) {
+        self.waypoint = waypoint
+        _nameDraft = State(initialValue: waypoint.name)
+        _noteDraft = State(initialValue: waypoint.note)
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -275,15 +284,18 @@ private struct WaypointStatsCard: View {
                 .overlay(Circle().stroke(.white.opacity(0.85), lineWidth: 2))
 
             VStack(alignment: .leading, spacing: 12) {
-                TextField("Waypoint name", text: waypointName)
+                TextField("Waypoint name", text: $nameDraft)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(AtlasTheme.forest)
-                    .focused($isEditingName)
-                    .onSubmit { finishEditing() }
+                    .focused($focusedField, equals: .name)
+                    .onSubmit {
+                        finishEditing()
+                        focusedField = nil
+                    }
                     .overlay(alignment: .bottom) {
                         Rectangle()
-                            .fill(isEditingName ? AtlasTheme.orange : .clear)
+                            .fill(focusedField == .name ? AtlasTheme.orange : .clear)
                             .frame(height: 1.5)
                             .offset(y: 4)
                     }
@@ -294,11 +306,12 @@ private struct WaypointStatsCard: View {
                     stat("To next", value: waypoint.distanceToNextMeters.map(formatDistance) ?? "Finish")
                 }
 
-                TextField("Add a waypoint comment…", text: waypointNote, axis: .vertical)
+                TextField("Add a waypoint comment…", text: $noteDraft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
                     .foregroundStyle(AtlasTheme.forest)
                     .lineLimit(2...4)
+                    .focused($focusedField, equals: .note)
                     .padding(10)
                     .background(AtlasTheme.moss.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
@@ -327,8 +340,13 @@ private struct WaypointStatsCard: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(AtlasTheme.moss.opacity(0.10), lineWidth: 1)
         )
-        .onChange(of: isEditingName) { _, focused in
-            if !focused { finishEditing() }
+        .onChange(of: focusedField) { previous, current in
+            if previous == .name, current != .name { finishEditing() }
+            if previous == .note, current != .note { commitNote() }
+        }
+        .onDisappear {
+            finishEditing()
+            commitNote()
         }
         .alert("Remove \(waypoint.name)?", isPresented: $showRemoveConfirmation) {
             Button("Remove", role: .destructive) { state.removeWaypoint(id: waypoint.id) }
@@ -336,24 +354,6 @@ private struct WaypointStatsCard: View {
         } message: {
             Text(removalExplanation)
         }
-    }
-
-    private var waypointName: Binding<String> {
-        Binding(
-            get: {
-                state.routeWaypointSummaries.first(where: { $0.id == waypoint.id })?.name ?? waypoint.name
-            },
-            set: { state.setWaypointName(id: waypoint.id, name: $0) }
-        )
-    }
-
-    private var waypointNote: Binding<String> {
-        Binding(
-            get: {
-                state.routeWaypointSummaries.first(where: { $0.id == waypoint.id })?.note ?? waypoint.note
-            },
-            set: { state.setWaypointNote(id: waypoint.id, note: $0) }
-        )
     }
 
     private var waypointKindLabel: String {
@@ -395,8 +395,17 @@ private struct WaypointStatsCard: View {
     }
 
     private func finishEditing() {
-        state.normalizeWaypointName(id: waypoint.id)
-        isEditingName = false
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? waypoint.name : trimmed
+        nameDraft = resolved
+        if resolved != waypoint.name {
+            state.setWaypointName(id: waypoint.id, name: resolved)
+        }
+    }
+
+    private func commitNote() {
+        guard noteDraft != waypoint.note else { return }
+        state.setWaypointNote(id: waypoint.id, note: noteDraft)
     }
 }
 

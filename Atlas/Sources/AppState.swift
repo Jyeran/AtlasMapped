@@ -160,7 +160,10 @@ final class AppState: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
     private var elevationTask: Task<Void, Never>?
     private var routeFitTask: Task<Void, Never>?
-    private var routeRevision = UUID()
+    private(set) var routeRevision = UUID()
+    private(set) var measurementRevision = UUID()
+    private(set) var offlineSelectionRevision = UUID()
+    private(set) var annotationRevision = UUID()
     private static let mapViewportDefaultsKey = "atlas.lastMapViewport.v1"
     private var shouldFocusFirstLocation: Bool
     private struct RouteGeometrySnapshot {
@@ -171,6 +174,8 @@ final class AppState: ObservableObject {
     }
     private var routeUndoHistory: [RouteGeometrySnapshot] = []
     private var routeRedoHistory: [RouteGeometrySnapshot] = []
+    private var cachedRouteMetrics: (revision: UUID, cumulative: [CLLocationDistance])?
+    private var cachedMeasurementMetrics: (revision: UUID, distance: CLLocationDistance)?
 
     init() {
         shouldFocusFirstLocation = Self.storedMapViewport == nil
@@ -238,11 +243,17 @@ final class AppState: ObservableObject {
     }
 
     var measuredDistance: CLLocationDistance {
-        RouteMath.distance(along: measurePoints)
+        if let cachedMeasurementMetrics,
+           cachedMeasurementMetrics.revision == measurementRevision {
+            return cachedMeasurementMetrics.distance
+        }
+        let distance = RouteMath.distance(along: measurePoints)
+        cachedMeasurementMetrics = (measurementRevision, distance)
+        return distance
     }
 
     var routeDistance: CLLocationDistance {
-        RouteMath.distance(along: routePoints)
+        routeCumulativeDistances.last ?? 0
     }
 
     var hasActiveRoute: Bool { routePoints.count > 1 }
@@ -289,7 +300,7 @@ final class AppState: ObservableObject {
     }
 
     var routeWaypointSummaries: [RouteWaypointSummary] {
-        let cumulative = RouteMath.cumulativeDistances(along: routePoints)
+        let cumulative = routeCumulativeDistances
         let total = cumulative.last ?? 0
         let sorted = namedRouteWaypoints
             .filter { routePoints.indices.contains($0.routePointIndex) }
@@ -320,11 +331,16 @@ final class AppState: ObservableObject {
     }
 
     var routeElevationProbeSummaries: [RouteElevationProbeSummary] {
-        routeElevationProbes
+        let cumulative = routeCumulativeDistances
+        return routeElevationProbes
             .sorted { $0.progress < $1.progress }
             .enumerated()
             .compactMap { index, probe in
-                guard let coordinate = RouteMath.coordinate(at: probe.progress, along: routePoints) else {
+                guard let coordinate = RouteMath.coordinate(
+                    at: probe.progress,
+                    along: routePoints,
+                    cumulativeDistances: cumulative
+                ) else {
                     return nil
                 }
                 return RouteElevationProbeSummary(
@@ -336,6 +352,15 @@ final class AppState: ObservableObject {
                     distanceAlongMeters: routeDistance * probe.progress
                 )
             }
+    }
+
+    private var routeCumulativeDistances: [CLLocationDistance] {
+        if let cachedRouteMetrics, cachedRouteMetrics.revision == routeRevision {
+            return cachedRouteMetrics.cumulative
+        }
+        let cumulative = RouteMath.cumulativeDistances(along: routePoints)
+        cachedRouteMetrics = (routeRevision, cumulative)
+        return cumulative
     }
 
     func selectRouteElevationProbe(at progress: Double) {
@@ -351,10 +376,12 @@ final class AppState: ObservableObject {
             routeElevationProbes[nearestIndex].progress = clamped
         }
         routeElevationProbes.sort { $0.progress < $1.progress }
+        annotationRevision = UUID()
     }
 
     func clearRouteElevationProbes() {
         routeElevationProbes.removeAll()
+        annotationRevision = UUID()
     }
 
     func handleMapTap(_ coordinate: CLLocationCoordinate2D) {
@@ -366,11 +393,13 @@ final class AppState: ObservableObject {
         case .pin:
             let pin = RoutePin(coordinate: coordinate, title: "Pin \(pins.count + 1)")
             pins.append(pin)
+            annotationRevision = UUID()
             selectedPinID = pin.id
             persistCurrentRouteIfSaved()
         case .measure:
             selectedPinID = nil
             measurePoints.append(coordinate)
+            measurementRevision = UUID()
         case .route:
             selectedPinID = nil
             addRouteWaypoint(coordinate)
@@ -482,13 +511,13 @@ final class AppState: ObservableObject {
         prepareRouteForEditing()
         recordRouteEdit()
         routePoints.append(coordinate)
-        routeGeometryDidChange()
+        routeGeometryDidChange(shouldRefresh: false, isLiveEdit: true)
     }
 
     func continueRouteStroke(to coordinate: CLLocationCoordinate2D) {
         guard selectedTool == .route else { return }
         routePoints.append(coordinate)
-        routeGeometryDidChange()
+        routeGeometryDidChange(shouldRefresh: false, isLiveEdit: true)
     }
 
     func finishRouteStroke(at coordinate: CLLocationCoordinate2D) {
@@ -512,11 +541,13 @@ final class AppState: ObservableObject {
     func beginMeasurementStroke(at coordinate: CLLocationCoordinate2D) {
         guard selectedTool == .measure else { return }
         measurePoints.append(coordinate)
+        measurementRevision = UUID()
     }
 
     func continueMeasurementStroke(to coordinate: CLLocationCoordinate2D) {
         guard selectedTool == .measure else { return }
         measurePoints.append(coordinate)
+        measurementRevision = UUID()
     }
 
     func finishMeasurementStroke(at coordinate: CLLocationCoordinate2D) {
@@ -526,6 +557,7 @@ final class AppState: ObservableObject {
         if releaseDistance > 0.25 {
             measurePoints.append(coordinate)
         }
+        measurementRevision = UUID()
     }
 
     private func prepareRouteForEditing() {
@@ -540,7 +572,9 @@ final class AppState: ObservableObject {
 
     func clearActiveDrawing() {
         switch selectedTool {
-        case .measure: measurePoints.removeAll()
+        case .measure:
+            measurePoints.removeAll()
+            measurementRevision = UUID()
         case .route:
             guard !routePoints.isEmpty else { return }
             recordRouteEdit()
@@ -558,24 +592,28 @@ final class AppState: ObservableObject {
         selectedTool = .explore
         isSelectingOfflineArea = true
         offlineSelectionPoints.removeAll()
+        offlineSelectionRevision = UUID()
         offlineDraft = nil
     }
 
     func updateOfflineSelection(_ points: [CLLocationCoordinate2D]) {
         guard isSelectingOfflineArea else { return }
         offlineSelectionPoints = points
+        offlineSelectionRevision = UUID()
         offlineDraft = nil
     }
 
     func finishOfflineSelection(_ points: [CLLocationCoordinate2D]) {
         guard isSelectingOfflineArea else { return }
         offlineSelectionPoints = points
+        offlineSelectionRevision = UUID()
         offlineDraft = offline.draft(for: points)
     }
 
     func cancelOfflineSelection() {
         isSelectingOfflineArea = false
         offlineSelectionPoints.removeAll()
+        offlineSelectionRevision = UUID()
         offlineDraft = nil
     }
 
@@ -643,6 +681,7 @@ final class AppState: ObservableObject {
         distanceFromRouteMeters = nil
         selectedTool = .explore
         routeRevision = UUID()
+        annotationRevision = UUID()
         focusMap(on: plan.coordinates)
         refreshElevationProfileIfNeeded()
     }
@@ -671,6 +710,7 @@ final class AppState: ObservableObject {
             NamedRouteWaypoint(routePointIndex: coordinates.index(before: coordinates.endIndex), name: "End")
         ]
         pins.removeAll()
+        annotationRevision = UUID()
         selectedPinID = nil
         routeProgress = 0
         distanceFromRouteMeters = nil
@@ -840,6 +880,8 @@ final class AppState: ObservableObject {
         routeWaypointIndices.removeAll()
         namedRouteWaypoints.removeAll()
         pins.removeAll()
+        routeRevision = UUID()
+        annotationRevision = UUID()
         currentRouteID = UUID()
         currentRouteCreatedAt = .now
         currentRouteName = "Recorded Hike"
@@ -879,6 +921,8 @@ final class AppState: ObservableObject {
                 name: split.name,
                 kind: .standard
             ))
+            routeRevision = UUID()
+            annotationRevision = UUID()
         }
     }
 
@@ -894,6 +938,7 @@ final class AppState: ObservableObject {
                !routeWaypointIndices.contains(lastIndex) {
                 routeWaypointIndices.insert(lastIndex)
                 namedRouteWaypoints.append(NamedRouteWaypoint(routePointIndex: lastIndex, name: "Finish"))
+                annotationRevision = UUID()
             }
             normalizeCurrentRouteName()
             recordedPlan = currentRoutePlan()
@@ -937,6 +982,8 @@ final class AppState: ObservableObject {
         routeWaypointIndices.removeAll()
         namedRouteWaypoints.removeAll()
         pins.removeAll()
+        routeRevision = UUID()
+        annotationRevision = UUID()
         selectedPinID = nil
         currentRouteName = "No active route"
         currentRouteID = UUID()
@@ -969,6 +1016,8 @@ final class AppState: ObservableObject {
         } else {
             routePoints.append(coordinate)
         }
+        routeRevision = UUID()
+        annotationRevision = UUID()
     }
 
     func setWaypointName(id: UUID, name: String) {
@@ -1062,6 +1111,7 @@ final class AppState: ObservableObject {
     func setPinTitle(id: UUID, title: String) {
         guard let index = pins.firstIndex(where: { $0.id == id }) else { return }
         pins[index].title = title
+        annotationRevision = UUID()
         for waypointIndex in namedRouteWaypoints.indices
         where namedRouteWaypoints[waypointIndex].resolvedKind == .pin
             && namedRouteWaypoints[waypointIndex].sourceID == id.uuidString {
@@ -1089,6 +1139,7 @@ final class AppState: ObservableObject {
 
     func removePin(id: UUID) {
         pins.removeAll { $0.id == id }
+        annotationRevision = UUID()
         if selectedPinID == id { selectedPinID = nil }
         persistCurrentRouteIfSaved()
     }
@@ -1108,16 +1159,24 @@ final class AppState: ObservableObject {
         scheduleElevationRefresh(delayNanoseconds: 0)
     }
 
-    private func routeGeometryDidChange(shouldRefresh: Bool = true) {
+    private func routeGeometryDidChange(
+        shouldRefresh: Bool = true,
+        isLiveEdit: Bool = false
+    ) {
         routeFitTask?.cancel()
-        isFittingRoute = false
-        isRouteFitted = false
+        if isFittingRoute { isFittingRoute = false }
+        if isRouteFitted { isRouteFitted = false }
         routeRevision = UUID()
-        routeElevationProbes.removeAll()
-        currentElevationGainMeters = 0
-        currentRouteElevationProfileMeters = nil
-        currentElevationProfileProvider = nil
-        elevationProfileError = nil
+        if !isLiveEdit { annotationRevision = UUID() }
+        if !routeElevationProbes.isEmpty { routeElevationProbes.removeAll() }
+        if currentElevationGainMeters != 0 { currentElevationGainMeters = 0 }
+        if currentRouteElevationProfileMeters != nil { currentRouteElevationProfileMeters = nil }
+        if currentElevationProfileProvider != nil { currentElevationProfileProvider = nil }
+        if elevationProfileError != nil { elevationProfileError = nil }
+        if isLiveEdit {
+            elevationTask?.cancel()
+            if isLoadingElevationProfile { isLoadingElevationProfile = false }
+        }
         if shouldRefresh, hasActiveRoute {
             scheduleElevationRefresh(delayNanoseconds: 650_000_000)
         }
@@ -1192,6 +1251,7 @@ final class AppState: ObservableObject {
                 self.currentElevationProfileProvider = ElevationService.providerID
                 self.isLoadingElevationProfile = false
                 self.elevationProfileError = nil
+                self.annotationRevision = UUID()
                 if self.routes.routes.contains(where: { $0.id == self.currentRouteID }) {
                     self.routes.save(self.currentRoutePlan())
                 }

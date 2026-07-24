@@ -2,6 +2,9 @@ import SwiftUI
 
 struct PinEditorCard: View {
     @EnvironmentObject private var state: AppState
+    @State private var titleDraft = ""
+    @State private var noteDraft = ""
+    @FocusState private var isTitleFocused: Bool
 
     var body: some View {
         if let pin = state.selectedPin {
@@ -11,14 +14,18 @@ struct PinEditorCard: View {
                         .font(.system(size: 21, weight: .semibold))
                         .foregroundStyle(AtlasTheme.trailBlue)
 
-                    TextField("Pin name", text: titleBinding(for: pin.id))
+                    TextField("Pin name", text: $titleDraft)
                         .textFieldStyle(.plain)
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundStyle(AtlasTheme.forest)
-                        .onSubmit { state.normalizePinTitle(id: pin.id) }
+                        .focused($isTitleFocused)
+                        .onSubmit { commit(pinID: pin.id) }
                         .accessibilityLabel("Pin name")
 
-                    Button { state.dismissPinEditor() } label: {
+                    Button {
+                        commit(pinID: pin.id)
+                        state.dismissPinEditor()
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 11, weight: .bold))
                             .frame(width: 28, height: 28)
@@ -30,7 +37,7 @@ struct PinEditorCard: View {
                 }
 
                 ZStack(alignment: .topLeading) {
-                    if pin.note.isEmpty {
+                    if noteDraft.isEmpty {
                         Text("Add a trail note…")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -39,7 +46,7 @@ struct PinEditorCard: View {
                             .allowsHitTesting(false)
                     }
 
-                    TextEditor(text: noteBinding(for: pin.id))
+                    TextEditor(text: $noteDraft)
                         .font(.subheadline)
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 58, maxHeight: 78)
@@ -65,21 +72,32 @@ struct PinEditorCard: View {
             .frame(minWidth: 280, idealWidth: 330, maxWidth: 360)
             .atlasPanel()
             .accessibilityElement(children: .contain)
+            .onAppear { loadDrafts(from: pin) }
+            .onChange(of: state.selectedPinID) { _, _ in
+                if let selected = state.selectedPin { loadDrafts(from: selected) }
+            }
+            .onChange(of: isTitleFocused) { _, focused in
+                if !focused { commit(pinID: pin.id) }
+            }
+            .onDisappear { commit(pinID: pin.id) }
         }
     }
 
-    private func titleBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: { state.pins.first(where: { $0.id == id })?.title ?? "" },
-            set: { state.setPinTitle(id: id, title: $0) }
-        )
+    private func loadDrafts(from pin: RoutePin) {
+        titleDraft = pin.title
+        noteDraft = pin.note
     }
 
-    private func noteBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: { state.pins.first(where: { $0.id == id })?.note ?? "" },
-            set: { state.setPinNote(id: id, note: $0) }
-        )
+    private func commit(pinID: UUID) {
+        let trimmed = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? "Untitled Pin" : trimmed
+        titleDraft = resolved
+        if state.pins.first(where: { $0.id == pinID })?.title != resolved {
+            state.setPinTitle(id: pinID, title: resolved)
+        }
+        if state.pins.first(where: { $0.id == pinID })?.note != noteDraft {
+            state.setPinNote(id: pinID, note: noteDraft)
+        }
     }
 
     private func coordinateLabel(_ pin: RoutePin) -> String {

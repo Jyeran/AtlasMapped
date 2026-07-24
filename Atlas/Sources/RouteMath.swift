@@ -31,16 +31,29 @@ enum RouteMath {
         at progress: Double,
         along coordinates: [CLLocationCoordinate2D]
     ) -> CLLocationCoordinate2D? {
+        coordinate(
+            at: progress,
+            along: coordinates,
+            cumulativeDistances: cumulativeDistances(along: coordinates)
+        )
+    }
+
+    static func coordinate(
+        at progress: Double,
+        along coordinates: [CLLocationCoordinate2D],
+        cumulativeDistances: [CLLocationDistance]
+    ) -> CLLocationCoordinate2D? {
         guard let first = coordinates.first else { return nil }
         guard coordinates.count > 1 else { return first }
 
-        let cumulative = cumulativeDistances(along: coordinates)
-        guard let total = cumulative.last, total > 0 else { return first }
+        guard cumulativeDistances.count == coordinates.count,
+              let total = cumulativeDistances.last,
+              total > 0 else { return first }
         let target = min(1, max(0, progress)) * total
 
-        for index in 1..<coordinates.count where cumulative[index] >= target {
-            let segmentStart = cumulative[index - 1]
-            let segmentLength = cumulative[index] - segmentStart
+        for index in 1..<coordinates.count where cumulativeDistances[index] >= target {
+            let segmentStart = cumulativeDistances[index - 1]
+            let segmentLength = cumulativeDistances[index] - segmentStart
             let fraction = segmentLength > 0 ? (target - segmentStart) / segmentLength : 0
             let start = MKMapPoint(coordinates[index - 1])
             let end = MKMapPoint(coordinates[index])

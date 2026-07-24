@@ -5,6 +5,8 @@ struct RouteProgressCard: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var didSave = false
     @State private var elevationChartMode: ElevationChartMode = .profile
+    @State private var routeNameDraft = ""
+    @FocusState private var isRouteNameFocused: Bool
     @GestureState(
         resetTransaction: Transaction(
             animation: .interactiveSpring(response: 0.28, dampingFraction: 0.82)
@@ -72,6 +74,21 @@ struct RouteProgressCard: View {
         }
         .onChange(of: state.currentRouteName) { _, _ in
             didSave = false
+            if !isRouteNameFocused {
+                routeNameDraft = state.currentRouteName
+            }
+        }
+        .onChange(of: state.currentRouteID) { _, _ in
+            routeNameDraft = state.currentRouteName
+        }
+        .onChange(of: routeNameDraft) { _, _ in
+            didSave = false
+        }
+        .onChange(of: isRouteNameFocused) { _, focused in
+            if !focused { commitRouteName() }
+        }
+        .onAppear {
+            routeNameDraft = state.currentRouteName
         }
         .alert("Couldn’t fit route", isPresented: routeFitAlert) {
             Button("OK", role: .cancel) { state.routeFitError = nil }
@@ -113,11 +130,12 @@ struct RouteProgressCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    TextField("Route name", text: $state.currentRouteName)
+                    TextField("Route name", text: $routeNameDraft)
                         .textFieldStyle(.plain)
                         .font(.title3.bold())
                         .lineLimit(1)
-                        .onSubmit { state.normalizeCurrentRouteName() }
+                        .focused($isRouteNameFocused)
+                        .onSubmit { commitRouteName() }
                         .accessibilityLabel("Route name, editable")
                         .frame(width: 190)
 
@@ -167,7 +185,10 @@ struct RouteProgressCard: View {
     }
 
     private var startButton: some View {
-        Button { state.startRouteTracking() } label: {
+        Button {
+            commitRouteName()
+            state.startRouteTracking()
+        } label: {
             Label("Start", systemImage: "play.fill")
                 .font(.system(size: 16, weight: .bold))
                 .frame(minWidth: 126, minHeight: 46)
@@ -181,7 +202,7 @@ struct RouteProgressCard: View {
 
     private var saveButton: some View {
         Button {
-            state.normalizeCurrentRouteName()
+            commitRouteName()
             state.saveCurrentRoute()
             withAnimation(.snappy) { didSave = true }
         } label: {
@@ -381,6 +402,14 @@ struct RouteProgressCard: View {
             get: { state.routeFitError != nil },
             set: { if !$0 { state.routeFitError = nil } }
         )
+    }
+
+    private func commitRouteName() {
+        let trimmed = routeNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = trimmed.isEmpty ? "Untitled Route" : trimmed
+        routeNameDraft = resolved
+        guard state.currentRouteName != resolved else { return }
+        state.currentRouteName = resolved
     }
 
     private func routeHistoryButton(

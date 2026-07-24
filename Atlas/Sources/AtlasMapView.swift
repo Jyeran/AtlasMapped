@@ -78,10 +78,19 @@ struct AtlasMapView {
         private var trailLoadTask: Task<Void, Never>?
         private var trailLoadGeneration = UUID()
         private var loadedTrailDataset = TrailMapDataset(trails: [], points: [])
+        private var loadedTrailsByID: [String: TrailMapFeature] = [:]
+        private var loadedPointsByID: [String: OutdoorPointFeature] = [:]
         private var hasObservedInitialRegion = false
         private var lassoCoordinates: [CLLocationCoordinate2D] = []
         private var lastDrawingStrokePoint: CGPoint?
         private var headingConeAnnotation: HeadingConeAnnotation?
+        private var routeOverlay: MKPolyline?
+        private var measurementOverlay: MeasurementPolyline?
+        private var offlineSelectionOverlay: MKOverlay?
+        private var renderedRouteRevision: UUID?
+        private var renderedMeasurementRevision: UUID?
+        private var renderedOfflineSelectionRevision: UUID?
+        private var renderedAnnotationRevision: UUID?
         #if os(iOS)
         private weak var lassoGesture: UIPanGestureRecognizer?
         private weak var routeDrawGesture: UILongPressGestureRecognizer?
@@ -137,31 +146,65 @@ struct AtlasMapView {
         }
 
         func updateContent(on map: MKMapView) {
-            map.removeOverlays(map.overlays.filter { $0 is MKPolyline && !($0 is TrailPolyline) })
-            map.removeOverlays(map.overlays.filter { $0 is OfflineSelectionPolygon })
-            if owner.state.routePoints.count > 1 {
-                map.addOverlay(MKPolyline(coordinates: owner.state.routePoints, count: owner.state.routePoints.count), level: .aboveLabels)
-            }
-            if owner.state.measurePoints.count > 1 {
-                let measurement = MeasurementPolyline(coordinates: owner.state.measurePoints, count: owner.state.measurePoints.count)
-                map.addOverlay(measurement, level: .aboveLabels)
-            }
-
-            if owner.state.offlineSelectionPoints.count > 2 {
-                let polygon = OfflineSelectionPolygon(
-                    coordinates: owner.state.offlineSelectionPoints,
-                    count: owner.state.offlineSelectionPoints.count
-                )
-                map.addOverlay(polygon, level: .aboveLabels)
-            } else if owner.state.offlineSelectionPoints.count > 1 {
-                let line = OfflineSelectionPolyline(
-                    coordinates: owner.state.offlineSelectionPoints,
-                    count: owner.state.offlineSelectionPoints.count
-                )
-                map.addOverlay(line, level: .aboveLabels)
+            if renderedRouteRevision != owner.state.routeRevision {
+                renderedRouteRevision = owner.state.routeRevision
+                if let routeOverlay {
+                    map.removeOverlay(routeOverlay)
+                    self.routeOverlay = nil
+                }
+                if owner.state.routePoints.count > 1 {
+                    let overlay = MKPolyline(
+                        coordinates: owner.state.routePoints,
+                        count: owner.state.routePoints.count
+                    )
+                    routeOverlay = overlay
+                    map.addOverlay(overlay, level: .aboveLabels)
+                }
             }
 
-            syncUserAnnotations(on: map)
+            if renderedMeasurementRevision != owner.state.measurementRevision {
+                renderedMeasurementRevision = owner.state.measurementRevision
+                if let measurementOverlay {
+                    map.removeOverlay(measurementOverlay)
+                    self.measurementOverlay = nil
+                }
+                if owner.state.measurePoints.count > 1 {
+                    let overlay = MeasurementPolyline(
+                        coordinates: owner.state.measurePoints,
+                        count: owner.state.measurePoints.count
+                    )
+                    measurementOverlay = overlay
+                    map.addOverlay(overlay, level: .aboveLabels)
+                }
+            }
+
+            if renderedOfflineSelectionRevision != owner.state.offlineSelectionRevision {
+                renderedOfflineSelectionRevision = owner.state.offlineSelectionRevision
+                if let offlineSelectionOverlay {
+                    map.removeOverlay(offlineSelectionOverlay)
+                    self.offlineSelectionOverlay = nil
+                }
+                if owner.state.offlineSelectionPoints.count > 2 {
+                    let overlay = OfflineSelectionPolygon(
+                        coordinates: owner.state.offlineSelectionPoints,
+                        count: owner.state.offlineSelectionPoints.count
+                    )
+                    offlineSelectionOverlay = overlay
+                    map.addOverlay(overlay, level: .aboveLabels)
+                } else if owner.state.offlineSelectionPoints.count > 1 {
+                    let overlay = OfflineSelectionPolyline(
+                        coordinates: owner.state.offlineSelectionPoints,
+                        count: owner.state.offlineSelectionPoints.count
+                    )
+                    offlineSelectionOverlay = overlay
+                    map.addOverlay(overlay, level: .aboveLabels)
+                }
+            }
+
+            if renderedAnnotationRevision != owner.state.annotationRevision {
+                renderedAnnotationRevision = owner.state.annotationRevision
+                syncUserAnnotations(on: map)
+            }
         }
 
         func updateHeadingIndicator(on map: MKMapView) {
@@ -176,15 +219,27 @@ struct AtlasMapView {
             let annotation: HeadingConeAnnotation
             if let existing = headingConeAnnotation {
                 annotation = existing
-                annotation.coordinate = location.coordinate
+                if abs(annotation.coordinate.latitude - location.coordinate.latitude) > 0.0000005
+                    || abs(annotation.coordinate.longitude - location.coordinate.longitude) > 0.0000005 {
+                    annotation.coordinate = location.coordinate
+                }
             } else {
                 annotation = HeadingConeAnnotation(coordinate: location.coordinate)
                 headingConeAnnotation = annotation
                 map.addAnnotation(annotation)
             }
-            annotation.headingDegrees = owner.state.location.headingDegrees
-            if let view = map.view(for: annotation) as? HeadingConeView {
-                view.setHeading(annotation.headingDegrees)
+            let heading = owner.state.location.headingDegrees
+            let headingChanged: Bool
+            if let previous = annotation.headingDegrees, let heading {
+                headingChanged = abs(previous - heading) > 0.5
+            } else {
+                headingChanged = annotation.headingDegrees != heading
+            }
+            if headingChanged {
+                annotation.headingDegrees = heading
+                if let view = map.view(for: annotation) as? HeadingConeView {
+                    view.setHeading(heading)
+                }
             }
         }
 
@@ -213,9 +268,13 @@ struct AtlasMapView {
                 }
             }
 
+            let namedWaypointsByIndex = Dictionary(
+                owner.state.namedRouteWaypoints.map { ($0.routePointIndex, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
             let desiredWaypoints = owner.state.routeWaypointIndices.sorted().enumerated().compactMap { sequence, index -> RouteWaypointAnnotation? in
                 guard owner.state.routePoints.indices.contains(index) else { return nil }
-                let waypoint = owner.state.namedRouteWaypoints.first { $0.routePointIndex == index }
+                let waypoint = namedWaypointsByIndex[index]
                 return RouteWaypointAnnotation(
                     coordinate: owner.state.routePoints[index],
                     sequence: sequence + 1,
@@ -225,23 +284,28 @@ struct AtlasMapView {
                 )
             }
             let existingWaypoints = map.annotations.compactMap { $0 as? RouteWaypointAnnotation }
-            var unmatchedExisting = existingWaypoints
+            let existingByID = Dictionary(
+                existingWaypoints.compactMap { annotation in
+                    annotation.waypointID.map { ($0, annotation) }
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let existingByIndex = Dictionary(
+                existingWaypoints.filter { $0.waypointID == nil }.map { ($0.routePointIndex, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            var matchedExisting = Set<ObjectIdentifier>()
             var additions: [RouteWaypointAnnotation] = []
 
             for desired in desiredWaypoints {
-                let matchIndex = unmatchedExisting.firstIndex { existing in
-                    if let waypointID = desired.waypointID {
-                        return existing.waypointID == waypointID
-                    }
-                    return existing.waypointID == nil
-                        && existing.routePointIndex == desired.routePointIndex
-                }
-                guard let matchIndex else {
+                let existing = desired.waypointID.flatMap { existingByID[$0] }
+                    ?? existingByIndex[desired.routePointIndex]
+                guard let existing else {
                     additions.append(desired)
                     continue
                 }
 
-                let existing = unmatchedExisting.remove(at: matchIndex)
+                matchedExisting.insert(ObjectIdentifier(existing))
                 existing.coordinate = desired.coordinate
                 existing.sequence = desired.sequence
                 existing.routePointIndex = desired.routePointIndex
@@ -251,8 +315,11 @@ struct AtlasMapView {
                 }
             }
 
-            if !unmatchedExisting.isEmpty {
-                map.removeAnnotations(unmatchedExisting)
+            let removals = existingWaypoints.filter {
+                !matchedExisting.contains(ObjectIdentifier($0))
+            }
+            if !removals.isEmpty {
+                map.removeAnnotations(removals)
             }
             if !additions.isEmpty {
                 map.addAnnotations(additions)
@@ -309,7 +376,7 @@ struct AtlasMapView {
                 return view
             }
             if let outdoorPoint = annotation as? OutdoorPointAnnotation,
-               let feature = loadedTrailDataset.points.first(where: { $0.id == outdoorPoint.featureID }) {
+               let feature = loadedPointsByID[outdoorPoint.featureID] {
                 let reuseIdentifier = "atlas-outdoor-point"
                 let view = (mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKMarkerAnnotationView)
                     ?? MKMarkerAnnotationView(annotation: outdoorPoint, reuseIdentifier: reuseIdentifier)
@@ -402,17 +469,17 @@ struct AtlasMapView {
             }
             if owner.state.selectedTool == .route,
                let annotation = view.annotation as? OutdoorPointAnnotation,
-               let point = loadedTrailDataset.points.first(where: { $0.id == annotation.featureID }) {
+               let point = loadedPointsByID[annotation.featureID] {
                 owner.state.addOutdoorPointToRoute(point)
                 mapView.deselectAnnotation(annotation, animated: false)
                 return
             }
             guard owner.state.selectedTool == .explore else { return }
             if let trailName = view.annotation as? TrailNameAnnotation,
-               loadedTrailDataset.trails.contains(where: { $0.id == trailName.featureID }) {
+               loadedTrailsByID[trailName.featureID] != nil {
                 mapView.deselectAnnotation(trailName, animated: false)
             } else if let annotation = view.annotation as? OutdoorPointAnnotation,
-                      let point = loadedTrailDataset.points.first(where: { $0.id == annotation.featureID }) {
+                      let point = loadedPointsByID[annotation.featureID] {
                 owner.state.selectOutdoorPoint(point)
                 mapView.deselectAnnotation(annotation, animated: false)
             }
@@ -603,8 +670,12 @@ struct AtlasMapView {
         private func applyTrailDataset(_ dataset: TrailMapDataset, on map: MKMapView) {
             clearTrailContent(on: map)
             loadedTrailDataset = dataset
+            loadedTrailsByID = Dictionary(uniqueKeysWithValues: dataset.trails.map { ($0.id, $0) })
+            loadedPointsByID = Dictionary(uniqueKeysWithValues: dataset.points.map { ($0.id, $0) })
 
             var longestNamedTrail: [String: TrailMapFeature] = [:]
+            var trailOverlays: [TrailPolyline] = []
+            trailOverlays.reserveCapacity(dataset.trails.count)
             for feature in dataset.trails {
                 let coordinates = feature.coordinates.map(\.coordinate)
                 guard coordinates.count > 1 else { continue }
@@ -612,12 +683,15 @@ struct AtlasMapView {
                 polyline.source = feature.source
                 polyline.importance = feature.importance ?? .standard
                 polyline.featureID = feature.id
-                map.addOverlay(polyline, level: .aboveRoads)
+                trailOverlays.append(polyline)
 
                 guard let name = feature.name else { continue }
                 if feature.coordinates.count > (longestNamedTrail[name]?.coordinates.count ?? 0) {
                     longestNamedTrail[name] = feature
                 }
+            }
+            if !trailOverlays.isEmpty {
+                map.addOverlays(trailOverlays, level: .aboveRoads)
             }
 
             let names = longestNamedTrail.compactMap { name, feature -> TrailNameAnnotation? in
@@ -644,6 +718,8 @@ struct AtlasMapView {
                 $0 is TrailNameAnnotation || $0 is OutdoorPointAnnotation || $0 is ContourLabelAnnotation
             })
             loadedTrailDataset = TrailMapDataset(trails: [], points: [])
+            loadedTrailsByID.removeAll(keepingCapacity: true)
+            loadedPointsByID.removeAll(keepingCapacity: true)
         }
 
         private func activate(feature: TrailMapFeature) {
@@ -682,7 +758,7 @@ struct AtlasMapView {
                 }
                 .min { $0.1 < $1.1 }?.0
             guard let candidate,
-                  let feature = loadedTrailDataset.trails.first(where: { $0.id == candidate.featureID }) else {
+                  let feature = loadedTrailsByID[candidate.featureID] else {
                 return false
             }
             if owner.state.selectedTool == .route {
@@ -709,7 +785,7 @@ struct AtlasMapView {
             .min { $0.1 < $1.1 }?.0
 
             if let annotation = hit as? OutdoorPointAnnotation,
-               let feature = loadedTrailDataset.points.first(where: { $0.id == annotation.featureID }) {
+               let feature = loadedPointsByID[annotation.featureID] {
                 if owner.state.selectedTool == .route {
                     owner.state.addOutdoorPointToRoute(feature)
                 } else {
@@ -720,7 +796,7 @@ struct AtlasMapView {
                 return true
             }
             if let annotation = hit as? TrailNameAnnotation,
-               let feature = loadedTrailDataset.trails.first(where: { $0.id == annotation.featureID }) {
+               let feature = loadedTrailsByID[annotation.featureID] {
                 if owner.state.selectedTool == .route {
                     owner.state.addTrailFeatureToRoute(
                         coordinate: annotation.coordinate,
