@@ -3,6 +3,27 @@ import XCTest
 @testable import AtlasMapped
 
 final class RouteMathTests: XCTestCase {
+    func testTrailWidthCurveChangesSmoothlyAcrossZoomLayers() {
+        let spans = [0.44, 0.22, 0.11, 0.055, 0.0275, 0.01375]
+        let scales = spans.map(TrailRenderSizing.widthScale)
+
+        for pair in zip(scales, scales.dropFirst()) {
+            XCTAssertGreaterThan(pair.1, pair.0)
+            XCTAssertLessThanOrEqual(
+                pair.1 / pair.0,
+                1.17,
+                "A full zoom layer should not create a visible trail-width jump"
+            )
+        }
+    }
+
+    func testTrailWidthCurveIsContinuousWithinAZoomGesture() {
+        let before = TrailRenderSizing.widthScale(visibleSpan: 0.055)
+        let after = TrailRenderSizing.widthScale(visibleSpan: 0.054)
+
+        XCTAssertLessThan(abs(after - before) / before, 0.01)
+    }
+
     func testUnitSystemFormatsMetricAndImperialValuesConsistently() {
         XCTAssertEqual(AtlasUnitSystem.metric.distance(1_500), "1.5 km")
         XCTAssertEqual(AtlasUnitSystem.imperial.distance(1_609.344), "1 mi")

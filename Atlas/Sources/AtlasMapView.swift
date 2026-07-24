@@ -89,6 +89,7 @@ struct AtlasMapView {
         private var loadedTrailsByID: [String: TrailMapFeature] = [:]
         private var loadedPointsByID: [String: OutdoorPointFeature] = [:]
         private var hasObservedInitialRegion = false
+        private var lastStyledTrailSpan: Double?
         private var lassoCoordinates: [CLLocationCoordinate2D] = []
         private var lastDrawingStrokePoint: CGPoint?
         private var headingConeAnnotation: HeadingConeAnnotation?
@@ -579,14 +580,26 @@ struct AtlasMapView {
                 hasObservedInitialRegion = true
             }
             guard appliedTrails else { return }
-            updateTrailRendererScale(on: mapView)
+            updateTrailRendererScale(on: mapView, force: true)
             scheduleTrailRefresh(on: mapView)
         }
 
-        private func updateTrailRendererScale(on map: MKMapView) {
+        func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+            guard appliedTrails else { return }
+            updateTrailRendererScale(on: mapView)
+        }
+
+        private func updateTrailRendererScale(on map: MKMapView, force: Bool = false) {
+            let visibleSpan = TrailRenderSizing.visibleSpan(for: map.region)
+            if !force,
+               let lastStyledTrailSpan,
+               abs(log(visibleSpan / lastStyledTrailSpan)) < 0.06 {
+                return
+            }
+            lastStyledTrailSpan = visibleSpan
             for case let trail as TrailPolyline in map.overlays {
                 guard let renderer = map.renderer(for: trail) as? MKPolylineRenderer else { continue }
-                styleTrailRenderer(renderer, for: trail, on: map)
+                styleTrailRenderer(renderer, for: trail, visibleSpan: visibleSpan)
                 renderer.setNeedsDisplay()
             }
         }
@@ -596,22 +609,26 @@ struct AtlasMapView {
             for trail: TrailPolyline,
             on map: MKMapView
         ) {
+            styleTrailRenderer(
+                renderer,
+                for: trail,
+                visibleSpan: TrailRenderSizing.visibleSpan(for: map.region)
+            )
+        }
+
+        private func styleTrailRenderer(
+            _ renderer: MKPolylineRenderer,
+            for trail: TrailPolyline,
+            visibleSpan: Double
+        ) {
             let color: PlatformColor = switch trail.source {
             case .openStreetMap:
                 PlatformColor(red: 0.37, green: 0.30, blue: 0.21, alpha: 1)
             case .forestService:
                 PlatformColor(red: 0.31, green: 0.29, blue: 0.20, alpha: 1)
             }
-            let visibleSpan = max(
-                map.region.span.latitudeDelta,
-                map.region.span.longitudeDelta * 0.65
-            )
-            // Trail widths are expressed in screen points. Without this
-            // compensation they appear progressively bolder as the map
-            // shrinks beneath them. A gentle power curve keeps them readable
-            // while maintaining comparable emphasis across hiking zooms.
-            let zoomScale = min(1.08, max(0.38, pow(0.055 / max(visibleSpan, 0.001), 0.38)))
-            let opacityScale = 0.82 + 0.18 * zoomScale
+            let widthScale = TrailRenderSizing.widthScale(visibleSpan: visibleSpan)
+            let opacityScale = TrailRenderSizing.opacityScale(widthScale: widthScale)
 
             let baseWidth: CGFloat
             let baseAlpha: CGFloat
@@ -630,15 +647,11 @@ struct AtlasMapView {
                 baseAlpha = 0.72
                 baseDash = [10, 5]
             }
-            // Let the USGS ink and contour detail remain primary while trails
-            // read as a useful, integrated overlay rather than a second map.
-            let trailWidthEmphasis: CGFloat = 0.90
-            let trailOpacityEmphasis: CGFloat = 0.92
             renderer.strokeColor = color.withAlphaComponent(
-                baseAlpha * opacityScale * trailOpacityEmphasis
+                baseAlpha * opacityScale
             )
-            renderer.lineWidth = baseWidth * zoomScale * trailWidthEmphasis
-            renderer.lineDashPattern = baseDash.map { NSNumber(value: Double($0 * zoomScale)) }
+            renderer.lineWidth = baseWidth * widthScale
+            renderer.lineDashPattern = baseDash.map { NSNumber(value: Double($0 * widthScale)) }
             renderer.lineJoin = .round
             renderer.lineCap = .round
         }
@@ -1563,6 +1576,32 @@ final class WaterwayPolyline: MKPolyline { var kind = "stream" }
 final class TerrainContourPolyline: MKPolyline { var isIndex = false }
 final class OfflineSelectionPolyline: MKPolyline {}
 final class OfflineSelectionPolygon: MKPolygon {}
+
+enum TrailRenderSizing {
+    /// MapKit reports a continuous geographic span rather than a discrete
+    /// raster zoom. This keeps trail styling consistent across aspect ratios.
+    static func visibleSpan(for region: MKCoordinateRegion) -> Double {
+        max(0.0001, max(
+            region.span.latitudeDelta,
+            region.span.longitudeDelta * 0.65
+        ))
+    }
+
+    /// Trails intentionally render approximately one zoom layer leaner than
+    /// the prior treatment. The 0.22 exponent changes width by only ~16.5%
+    /// across a full 2× zoom step, avoiding obvious layer-to-layer jumps.
+    static func widthScale(visibleSpan: Double) -> CGFloat {
+        let safeSpan = max(visibleSpan, 0.0001)
+        let shiftedZoomLayers = log2(0.055 / safeSpan) - 1
+        let scale = 0.82 * pow(2, shiftedZoomLayers * 0.22)
+        return CGFloat(min(0.88, max(0.34, scale)))
+    }
+
+    static func opacityScale(widthScale: CGFloat) -> CGFloat {
+        let normalized = min(1, max(0, (widthScale - 0.34) / (0.88 - 0.34)))
+        return 0.70 + 0.18 * normalized
+    }
+}
 
 final class RouteWaypointAnnotation: NSObject, MKAnnotation {
     @objc dynamic var coordinate: CLLocationCoordinate2D
