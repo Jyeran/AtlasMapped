@@ -34,9 +34,17 @@ final class OfflineRegionManager: ObservableObject {
 
     private let zooms = 8...16
     private let maximumTileCount = 5_000
+    private let manifestURL: URL
     private var tasks: [UUID: Task<Void, Never>] = [:]
 
-    init() {
+    init(manifestURL: URL? = nil) {
+        let defaultManifestURL = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
+            .appendingPathComponent("AtlasMapped", isDirectory: true)
+            .appendingPathComponent("offline-areas.json")
+        self.manifestURL = manifestURL ?? defaultManifestURL
         TileCache.removeLegacyTopographicTiles()
         areas = loadManifest()
     }
@@ -92,6 +100,17 @@ final class OfflineRegionManager: ObservableObject {
         tasks[area.id]?.cancel()
         tasks[area.id] = nil
         progress[area.id] = nil
+    }
+
+    @discardableResult
+    func rename(_ area: OfflineMapArea, to proposedName: String) -> Bool {
+        let name = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty,
+              let index = areas.firstIndex(where: { $0.id == area.id }) else { return false }
+        guard areas[index].name != name else { return true }
+        areas[index].name = name
+        persistManifest()
+        return true
     }
 
     func delete(_ area: OfflineMapArea) {
@@ -182,9 +201,4 @@ final class OfflineRegionManager: ObservableObject {
         return (try? JSONDecoder.atlas.decode([OfflineMapArea].self, from: data)) ?? []
     }
 
-    private var manifestURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("AtlasMapped", isDirectory: true)
-            .appendingPathComponent("offline-areas.json")
-    }
 }

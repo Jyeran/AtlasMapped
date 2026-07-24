@@ -4,6 +4,33 @@ import XCTest
 @testable import AtlasMapped
 
 final class OfflineTileCoverageTests: XCTestCase {
+    @MainActor
+    func testOfflineAreaRenamePersistsAndRejectsBlankNames() throws {
+        let manifestURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("offline-areas.json")
+        defer { try? FileManager.default.removeItem(at: manifestURL.deletingLastPathComponent()) }
+
+        let manager = OfflineRegionManager(manifestURL: manifestURL)
+        let draft = OfflineMapDraft(
+            boundary: [
+                RouteWaypoint(CLLocationCoordinate2D(latitude: 39.9, longitude: -105.2)),
+                RouteWaypoint(CLLocationCoordinate2D(latitude: 39.9, longitude: -105.1)),
+                RouteWaypoint(CLLocationCoordinate2D(latitude: 40.0, longitude: -105.1))
+            ],
+            tiles: [OfflineTile(z: 8, x: 53, y: 97)]
+        )
+        let area = manager.download(draft, named: "Offline area 1")
+        manager.cancel(area)
+
+        XCTAssertFalse(manager.rename(area, to: "   "))
+        XCTAssertTrue(manager.rename(area, to: "  Buffalo Peaks Loop  "))
+        XCTAssertEqual(manager.areas.first?.name, "Buffalo Peaks Loop")
+
+        let reloaded = OfflineRegionManager(manifestURL: manifestURL)
+        XCTAssertEqual(reloaded.areas.first?.name, "Buffalo Peaks Loop")
+    }
+
     func testResidentTrailViewportCoversNearbyMapMovement() {
         let resident = TrailViewport(south: 39.8, west: -105.4, north: 40.2, east: -104.9)
         let nearby = TrailViewport(south: 39.9, west: -105.2, north: 40.1, east: -105.0)
