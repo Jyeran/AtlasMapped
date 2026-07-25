@@ -7,16 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000000000000000000001 /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* HikeActivity.swift */; };
-		A10000000000000000000002 /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* HikeActivity.swift */; };
-		A10000000000000000000003 /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* HikeHistoryView.swift */; };
-		A10000000000000000000004 /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* HikeHistoryView.swift */; };
 		06CAA734FC54F4DF7CD24E54 /* RouteLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D92253004C0815D9D54AD8B /* RouteLibrary.swift */; };
 		090BB4FA33C8616A796A7559 /* AtlasMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */; };
 		0A69909F6A143EC327AC88CD /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A655E3CAEE8F48C9C9647DA /* RootView.swift */; };
 		0E6AD2B1F0F4A5B95D59DFDD /* RoutePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6CC6C6714A1B19737583ED /* RoutePlan.swift */; };
 		1515AAC0E7531B1A8C5AF25B /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C210CD508E9A5A2A1CB0F1AE /* AppState.swift */; };
+		15308A3711D70ACCA2A34959 /* TrackingLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8E015792AA55762EF56F4C /* TrackingLiveActivityController.swift */; };
 		1BC45A0319139C1DD7D4887B /* TrailRouteFitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AC71E8517279484B65BD91 /* TrailRouteFitter.swift */; };
+		1D1052FBEB1F4E695424ACC5 /* AtlasTrackingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B57BE35B2A1FE6FB5A0F16 /* AtlasTrackingAttributes.swift */; };
 		1D203960DC2CF1E604FF4250 /* AtlasMappedApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DC4ED83F26A196EB5EB320A /* AtlasMappedApp.swift */; };
 		26D1FA12C7041DFEDA2274C1 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7054D7ADFB2924E5392404CC /* Theme.swift */; };
 		2A621C7373E5D46C68BEDEB1 /* RoutePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6CC6C6714A1B19737583ED /* RoutePlan.swift */; };
@@ -28,14 +26,21 @@
 		45E9A7A11C0DFFBFC6C2A57F /* AtlasMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */; };
 		46D88190AD5AA5D6DF3DC53C /* TrailDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA3911AC2F5FC15EC933F7D /* TrailDataService.swift */; };
 		4D6AB0916ABD0B599ADC0129 /* TrailDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEA3911AC2F5FC15EC933F7D /* TrailDataService.swift */; };
+		4DEDD2B1A13B785E8679720E /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F04C13E1A36FDBBE44C2380 /* HikeHistoryView.swift */; };
 		4F9D1D96DD3F90B71E2E312E /* OfflineMapsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 685B2421ED8DB00A46BFC48A /* OfflineMapsView.swift */; };
+		515C922A6824D9A0F976C5ED /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEC6E26FF7ED538B24BDE06 /* HikeActivity.swift */; };
+		53D105E01213B0DDA0D3664E /* HikeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F04C13E1A36FDBBE44C2380 /* HikeHistoryView.swift */; };
 		597A4E8E9FDCF437EE18A345 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 615B53F54599EF715B2C741F /* Assets.xcassets */; };
 		5A3CB9F1C240480FD173DA45 /* OfflineTileCoverage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52847DA48F0AFC36FD207359 /* OfflineTileCoverage.swift */; };
 		5AA56EFB5BE54DC7D3CEB15D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 615B53F54599EF715B2C741F /* Assets.xcassets */; };
+		5FC01ACE571C921AF8290E64 /* HikeActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEC6E26FF7ED538B24BDE06 /* HikeActivity.swift */; };
 		6553083D405901E1699B3FB8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A655E3CAEE8F48C9C9647DA /* RootView.swift */; };
 		665D9B3523B64049A365DF5C /* RouteDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28EBEBECF0837E99EEE69533 /* RouteDetailsView.swift */; };
 		6673DE0E1D1D48AD03F8B7A1 /* ConnectivityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34DC9DB6175BC2B796B05DEF /* ConnectivityMonitor.swift */; };
+		667ADC4F9BDFFB8E2CA175F9 /* TrackingLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8E015792AA55762EF56F4C /* TrackingLiveActivityController.swift */; };
 		6C27073D0F62AB58754CF519 /* ElevationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913CABB32E301DB30BC28783 /* ElevationService.swift */; };
+		702D59CFE2C1139D58478F20 /* AtlasLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 427598BBB3BD58E46ECDE18A /* AtlasLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		70FEDC3109CF7B62F36D9BA3 /* AtlasTrackingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BBC418DC4D5D5297401026 /* AtlasTrackingLiveActivity.swift */; };
 		714DAFE7A10E247BE279A174 /* RouteMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAC3EEFDB7490783644DB98 /* RouteMath.swift */; };
 		78472B95E9AD602F4D21F08C /* RouteLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D92253004C0815D9D54AD8B /* RouteLibrary.swift */; };
 		7D990E1D5C4C6F4C6B1389EF /* CachedTileOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A754455F4BB84916072016D6 /* CachedTileOverlay.swift */; };
@@ -45,6 +50,8 @@
 		A05140FD19EB7ED15CA80BD8 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7054D7ADFB2924E5392404CC /* Theme.swift */; };
 		A134BA0D7AFE7EA7F2992186 /* TrailRouteBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D6E4F4EE9DA1A80B364052 /* TrailRouteBuilder.swift */; };
 		A3F192B343564A60761F4FE6 /* OutdoorPointDetailsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF91F57223DFC8F67329B86F /* OutdoorPointDetailsCard.swift */; };
+		A57839B7EB852886A1B9E8EF /* AtlasLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 365EF0EEC077D62CAAB8298E /* AtlasLiveActivityBundle.swift */; };
+		AC4E7E4A82920884105A2C77 /* AtlasTrackingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B57BE35B2A1FE6FB5A0F16 /* AtlasTrackingAttributes.swift */; };
 		AC8CACC1D1D9DCFBA1BC8733 /* OfflineRegionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCF87731CEB61E064E688878 /* OfflineRegionManager.swift */; };
 		B3A40363FA309985E309540F /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F0CFF29267DC24B7117CC9 /* MapScreen.swift */; };
 		B49F7FF934C6F394389E986E /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F0CFF29267DC24B7117CC9 /* MapScreen.swift */; };
@@ -65,9 +72,31 @@
 		FD9CE9480E45567BE8230390 /* PinEditorCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331261B4FD5B7E73B33AB4CB /* PinEditorCard.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		618E57669C5ABB0F79FC7F63 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 59985B76FBC5E7FC2FBCECE5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AFB93538C4E6B90AAE57711F;
+			remoteInfo = AtlasLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3F017572F86330EA149EE1C6 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				702D59CFE2C1139D58478F20 /* AtlasLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		C10000000000000000000001 /* HikeActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeActivity.swift; sourceTree = "<group>"; };
-		C10000000000000000000002 /* HikeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeHistoryView.swift; sourceTree = "<group>"; };
 		030381F022678CD162270362 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasMapView.swift; sourceTree = "<group>"; };
 		1A655E3CAEE8F48C9C9647DA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -75,8 +104,11 @@
 		28EBEBECF0837E99EEE69533 /* RouteDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteDetailsView.swift; sourceTree = "<group>"; };
 		331261B4FD5B7E73B33AB4CB /* PinEditorCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinEditorCard.swift; sourceTree = "<group>"; };
 		34DC9DB6175BC2B796B05DEF /* ConnectivityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectivityMonitor.swift; sourceTree = "<group>"; };
+		365EF0EEC077D62CAAB8298E /* AtlasLiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasLiveActivityBundle.swift; sourceTree = "<group>"; };
+		3C8E015792AA55762EF56F4C /* TrackingLiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingLiveActivityController.swift; sourceTree = "<group>"; };
 		3FA115EEF7C028EBD81F2452 /* RouteProgressCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteProgressCard.swift; sourceTree = "<group>"; };
 		40AC71E8517279484B65BD91 /* TrailRouteFitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailRouteFitter.swift; sourceTree = "<group>"; };
+		427598BBB3BD58E46ECDE18A /* AtlasLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = AtlasLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		52847DA48F0AFC36FD207359 /* OfflineTileCoverage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineTileCoverage.swift; sourceTree = "<group>"; };
 		615B53F54599EF715B2C741F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		61F0CFF29267DC24B7117CC9 /* MapScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapScreen.swift; sourceTree = "<group>"; };
@@ -84,9 +116,12 @@
 		7054D7ADFB2924E5392404CC /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		77FCAB9A0BCC9BE8D654C9E7 /* Atlas-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Atlas-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7DC4ED83F26A196EB5EB320A /* AtlasMappedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasMappedApp.swift; sourceTree = "<group>"; };
+		7F04C13E1A36FDBBE44C2380 /* HikeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeHistoryView.swift; sourceTree = "<group>"; };
+		89B57BE35B2A1FE6FB5A0F16 /* AtlasTrackingAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasTrackingAttributes.swift; sourceTree = "<group>"; };
 		8D92253004C0815D9D54AD8B /* RouteLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteLibrary.swift; sourceTree = "<group>"; };
 		913CABB32E301DB30BC28783 /* ElevationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElevationService.swift; sourceTree = "<group>"; };
-		9499442367D7CF0D538D5A67 /* Atlas-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Atlas-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9499442367D7CF0D538D5A67 /* Atlas-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "Atlas-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		97BBC418DC4D5D5297401026 /* AtlasTrackingLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasTrackingLiveActivity.swift; sourceTree = "<group>"; };
 		9F6CC6C6714A1B19737583ED /* RoutePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePlan.swift; sourceTree = "<group>"; };
 		A754455F4BB84916072016D6 /* CachedTileOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedTileOverlay.swift; sourceTree = "<group>"; };
 		BFAC3EEFDB7490783644DB98 /* RouteMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteMath.swift; sourceTree = "<group>"; };
@@ -94,7 +129,9 @@
 		DCF87731CEB61E064E688878 /* OfflineRegionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineRegionManager.swift; sourceTree = "<group>"; };
 		DE9A218DF9919536FD57D533 /* RouteTransferView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteTransferView.swift; sourceTree = "<group>"; };
 		E3D6E4F4EE9DA1A80B364052 /* TrailRouteBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailRouteBuilder.swift; sourceTree = "<group>"; };
+		EAEC6E26FF7ED538B24BDE06 /* HikeActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HikeActivity.swift; sourceTree = "<group>"; };
 		EEA3911AC2F5FC15EC933F7D /* TrailDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailDataService.swift; sourceTree = "<group>"; };
+		F5D2F9B753A5A54C8BE13DD7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FF91F57223DFC8F67329B86F /* OutdoorPointDetailsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutdoorPointDetailsCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -103,9 +140,20 @@
 			isa = PBXGroup;
 			children = (
 				9BFA1BE7CB14F9566DEDF2C0 /* Atlas */,
+				C814D5A86F54D0E201A7B49D /* LiveActivity */,
+				6BD50C9254360B5B097BF36A /* Shared */,
 				AB47F1CE6D9361C64E3305DF /* Sources */,
 				D5D4685145A5127009B43BDB /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		6BD50C9254360B5B097BF36A /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				89B57BE35B2A1FE6FB5A0F16 /* AtlasTrackingAttributes.swift */,
+			);
+			name = Shared;
+			path = Atlas/Shared;
 			sourceTree = "<group>";
 		};
 		9BFA1BE7CB14F9566DEDF2C0 /* Atlas */ = {
@@ -120,13 +168,13 @@
 			isa = PBXGroup;
 			children = (
 				C210CD508E9A5A2A1CB0F1AE /* AppState.swift */,
-				C10000000000000000000001 /* HikeActivity.swift */,
-				C10000000000000000000002 /* HikeHistoryView.swift */,
 				7DC4ED83F26A196EB5EB320A /* AtlasMappedApp.swift */,
 				1156AF6635A1DB673D4B4768 /* AtlasMapView.swift */,
 				A754455F4BB84916072016D6 /* CachedTileOverlay.swift */,
 				34DC9DB6175BC2B796B05DEF /* ConnectivityMonitor.swift */,
 				913CABB32E301DB30BC28783 /* ElevationService.swift */,
+				EAEC6E26FF7ED538B24BDE06 /* HikeActivity.swift */,
+				7F04C13E1A36FDBBE44C2380 /* HikeHistoryView.swift */,
 				1E09540618F853F555F7AC1C /* LayerPanel.swift */,
 				030381F022678CD162270362 /* LocationService.swift */,
 				61F0CFF29267DC24B7117CC9 /* MapScreen.swift */,
@@ -143,6 +191,7 @@
 				3FA115EEF7C028EBD81F2452 /* RouteProgressCard.swift */,
 				DE9A218DF9919536FD57D533 /* RouteTransferView.swift */,
 				7054D7ADFB2924E5392404CC /* Theme.swift */,
+				3C8E015792AA55762EF56F4C /* TrackingLiveActivityController.swift */,
 				EEA3911AC2F5FC15EC933F7D /* TrailDataService.swift */,
 				E3D6E4F4EE9DA1A80B364052 /* TrailRouteBuilder.swift */,
 				40AC71E8517279484B65BD91 /* TrailRouteFitter.swift */,
@@ -151,11 +200,23 @@
 			path = Atlas/Sources;
 			sourceTree = "<group>";
 		};
+		C814D5A86F54D0E201A7B49D /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				365EF0EEC077D62CAAB8298E /* AtlasLiveActivityBundle.swift */,
+				97BBC418DC4D5D5297401026 /* AtlasTrackingLiveActivity.swift */,
+				F5D2F9B753A5A54C8BE13DD7 /* Info.plist */,
+			);
+			name = LiveActivity;
+			path = Atlas/LiveActivity;
+			sourceTree = "<group>";
+		};
 		D5D4685145A5127009B43BDB /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				9499442367D7CF0D538D5A67 /* Atlas-iOS.app */,
 				77FCAB9A0BCC9BE8D654C9E7 /* Atlas-macOS.app */,
+				427598BBB3BD58E46ECDE18A /* AtlasLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -163,6 +224,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AFB93538C4E6B90AAE57711F /* AtlasLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE5705DE4C8E3FFA6AEA64EC /* Build configuration list for PBXNativeTarget "AtlasLiveActivity" */;
+			buildPhases = (
+				60D7F887715138CA6DA82DDB /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AtlasLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = AtlasLiveActivity;
+			productReference = 427598BBB3BD58E46ECDE18A /* AtlasLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		B64A3EA6910A34C39B324940 /* Atlas-macOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7BCA95D0B73966C5119DDB47 /* Build configuration list for PBXNativeTarget "Atlas-macOS" */;
@@ -187,10 +265,12 @@
 			buildPhases = (
 				05644431C9BE548E65D551BE /* Sources */,
 				7B961569F4A6F5B886AD8462 /* Resources */,
+				3F017572F86330EA149EE1C6 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6A6446AE91E1938035B4D117 /* PBXTargetDependency */,
 			);
 			name = "Atlas-iOS";
 			packageProductDependencies = (
@@ -208,10 +288,15 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					AFB93538C4E6B90AAE57711F = {
+						DevelopmentTeam = 3GZG2C29FM;
+						ProvisioningStyle = Automatic;
+					};
 					B64A3EA6910A34C39B324940 = {
 						ProvisioningStyle = Automatic;
 					};
 					F9D0BB353DA981DB8D7A9C68 = {
+						DevelopmentTeam = 3GZG2C29FM;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -231,6 +316,7 @@
 			projectRoot = "";
 			targets = (
 				F9D0BB353DA981DB8D7A9C68 /* Atlas-iOS */,
+				AFB93538C4E6B90AAE57711F /* AtlasLiveActivity */,
 				B64A3EA6910A34C39B324940 /* Atlas-macOS */,
 			);
 		};
@@ -261,13 +347,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F74738647DFA1D6A1408F67C /* AppState.swift in Sources */,
-				A10000000000000000000001 /* HikeActivity.swift in Sources */,
-				A10000000000000000000003 /* HikeHistoryView.swift in Sources */,
 				45E9A7A11C0DFFBFC6C2A57F /* AtlasMapView.swift in Sources */,
 				1D203960DC2CF1E604FF4250 /* AtlasMappedApp.swift in Sources */,
+				1D1052FBEB1F4E695424ACC5 /* AtlasTrackingAttributes.swift in Sources */,
 				DA872EFDFD0D9856F8CB7405 /* CachedTileOverlay.swift in Sources */,
 				6673DE0E1D1D48AD03F8B7A1 /* ConnectivityMonitor.swift in Sources */,
 				ECFC2D9C44627C9D99C7D477 /* ElevationService.swift in Sources */,
+				515C922A6824D9A0F976C5ED /* HikeActivity.swift in Sources */,
+				53D105E01213B0DDA0D3664E /* HikeHistoryView.swift in Sources */,
 				DF60C6A676901F68B768A41F /* LayerPanel.swift in Sources */,
 				DB10CA61C950BCA189943F06 /* LocationService.swift in Sources */,
 				B3A40363FA309985E309540F /* MapScreen.swift in Sources */,
@@ -284,6 +371,7 @@
 				F68E379F8ACCB8FA864FE1D2 /* RouteProgressCard.swift in Sources */,
 				44FB95BA01D71D3239931FA3 /* RouteTransferView.swift in Sources */,
 				26D1FA12C7041DFEDA2274C1 /* Theme.swift in Sources */,
+				667ADC4F9BDFFB8E2CA175F9 /* TrackingLiveActivityController.swift in Sources */,
 				46D88190AD5AA5D6DF3DC53C /* TrailDataService.swift in Sources */,
 				A134BA0D7AFE7EA7F2992186 /* TrailRouteBuilder.swift in Sources */,
 				B8EEE1D7B61FAD659E1E8CC5 /* TrailRouteFitter.swift in Sources */,
@@ -295,13 +383,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				1515AAC0E7531B1A8C5AF25B /* AppState.swift in Sources */,
-				A10000000000000000000002 /* HikeActivity.swift in Sources */,
-				A10000000000000000000004 /* HikeHistoryView.swift in Sources */,
 				090BB4FA33C8616A796A7559 /* AtlasMapView.swift in Sources */,
 				9505834C0CB43D71FA38C80D /* AtlasMappedApp.swift in Sources */,
 				7D990E1D5C4C6F4C6B1389EF /* CachedTileOverlay.swift in Sources */,
 				C3307FBEF3A69A5D0CC74001 /* ConnectivityMonitor.swift in Sources */,
 				6C27073D0F62AB58754CF519 /* ElevationService.swift in Sources */,
+				5FC01ACE571C921AF8290E64 /* HikeActivity.swift in Sources */,
+				4DEDD2B1A13B785E8679720E /* HikeHistoryView.swift in Sources */,
 				8988BB553F8E99623D8BB170 /* LayerPanel.swift in Sources */,
 				9194D9049584300BE959438E /* LocationService.swift in Sources */,
 				B49F7FF934C6F394389E986E /* MapScreen.swift in Sources */,
@@ -318,13 +406,32 @@
 				BC7BD36F93A17E1310DDB9BE /* RouteProgressCard.swift in Sources */,
 				D337D1B12B8A5CC476FBE8EB /* RouteTransferView.swift in Sources */,
 				A05140FD19EB7ED15CA80BD8 /* Theme.swift in Sources */,
+				15308A3711D70ACCA2A34959 /* TrackingLiveActivityController.swift in Sources */,
 				4D6AB0916ABD0B599ADC0129 /* TrailDataService.swift in Sources */,
 				3BF4CAEDCA319F231A77EA95 /* TrailRouteBuilder.swift in Sources */,
 				1BC45A0319139C1DD7D4887B /* TrailRouteFitter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		60D7F887715138CA6DA82DDB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A57839B7EB852886A1B9E8EF /* AtlasLiveActivityBundle.swift in Sources */,
+				AC4E7E4A82920884105A2C77 /* AtlasTrackingAttributes.swift in Sources */,
+				70FEDC3109CF7B62F36D9BA3 /* AtlasTrackingLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6A6446AE91E1938035B4D117 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AFB93538C4E6B90AAE57711F /* AtlasLiveActivity */;
+			targetProxy = 618E57669C5ABB0F79FC7F63 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1D4F742059BA4EDBE9C138C2 /* Debug */ = {
@@ -347,8 +454,29 @@
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				UBIQUITY_KVSTORE_IDENTIFIER = "$(TeamIdentifierPrefix)com.atlasmapped.ios";
 			};
 			name = Debug;
+		};
+		3FC898845AF7EE4E03A7E928 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3GZG2C29FM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Atlas/LiveActivity/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.atlasmapped.ios.liveactivity;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 		47D87D375C354D4BB7BA7522 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -363,6 +491,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasmapped.macos;
 				SDKROOT = macosx;
+				UBIQUITY_KVSTORE_IDENTIFIER = "$(TeamIdentifierPrefix)com.atlasmapped.ios";
 			};
 			name = Release;
 		};
@@ -379,6 +508,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.atlasmapped.macos;
 				SDKROOT = macosx;
+				UBIQUITY_KVSTORE_IDENTIFIER = "$(TeamIdentifierPrefix)com.atlasmapped.ios";
 			};
 			name = Debug;
 		};
@@ -471,8 +601,29 @@
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				UBIQUITY_KVSTORE_IDENTIFIER = "$(TeamIdentifierPrefix)com.atlasmapped.ios";
 			};
 			name = Release;
+		};
+		B0F365CE591038013481F735 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 3GZG2C29FM;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Atlas/LiveActivity/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.atlasmapped.ios.liveactivity;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		D744FEABD4837C654206A623 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -562,6 +713,15 @@
 			buildConfigurations = (
 				4F6CE5DBAA24AFC3BDF90E12 /* Debug */,
 				47D87D375C354D4BB7BA7522 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CE5705DE4C8E3FFA6AEA64EC /* Build configuration list for PBXNativeTarget "AtlasLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0F365CE591038013481F735 /* Debug */,
+				3FC898845AF7EE4E03A7E928 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

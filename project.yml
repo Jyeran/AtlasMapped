@@ -19,10 +19,15 @@ targets:
     platform: iOS
     sources:
       - Atlas/Sources
+      - Atlas/Shared
       - Atlas/Assets.xcassets
+    dependencies:
+      - target: AtlasLiveActivity
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.atlasmapped.ios
+        DEVELOPMENT_TEAM: 3GZG2C29FM
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Atlas/Info-iOS.plist
         CODE_SIGN_ENTITLEMENTS: Atlas/Atlas-iOS.entitlements
@@ -32,6 +37,22 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
+  AtlasLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Atlas/LiveActivity
+      - Atlas/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.atlasmapped.ios.liveactivity
+        DEVELOPMENT_TEAM: 3GZG2C29FM
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Atlas/LiveActivity/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
   Atlas-macOS:
     type: application
     platform: macOS

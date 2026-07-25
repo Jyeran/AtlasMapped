@@ -4,6 +4,17 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>Atlas</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.atlasmapped.ios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>atlas</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +35,8 @@
 	<string>Atlas uses your location to keep route progress accurate while you hike.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Atlas uses your location to navigate trails and record route progress.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

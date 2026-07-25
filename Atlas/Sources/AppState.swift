@@ -157,6 +157,9 @@ final class AppState: ObservableObject {
     let routes = RouteLibrary()
     let hikeRecorder = HikeRecorder()
     let hikes = HikeLibrary()
+    #if os(iOS)
+    private let trackingLiveActivity = TrackingLiveActivityController()
+    #endif
     private let elevationService = ElevationService()
     private var subscriptions: Set<AnyCancellable> = []
     private var elevationTask: Task<Void, Never>?
@@ -230,6 +233,9 @@ final class AppState: ObservableObject {
                 if !self.hikeRecorder.isPaused {
                     self.updateTrackingPosition(newLocation)
                 }
+                #if os(iOS)
+                self.updateTrackingLiveActivity()
+                #endif
             }
         }
     }
@@ -272,6 +278,9 @@ final class AppState: ObservableObject {
         if persistsPreferences {
             UserDefaults.standard.set(unitSystem.rawValue, forKey: Self.unitSystemDefaultsKey)
         }
+        #if os(iOS)
+        if isTracking { updateTrackingLiveActivity(immediately: true) }
+        #endif
     }
 
     var measuredDistance: CLLocationDistance {
@@ -926,6 +935,9 @@ final class AppState: ObservableObject {
             hikeRecorder.ingest(location)
             updateTrackingPosition(location)
         }
+        #if os(iOS)
+        startTrackingLiveActivity()
+        #endif
     }
 
     func startFreeRecording() {
@@ -953,16 +965,25 @@ final class AppState: ObservableObject {
             hikeRecorder.ingest(current)
             appendRecordedRoutePoint(current.coordinate)
         }
+        #if os(iOS)
+        startTrackingLiveActivity()
+        #endif
     }
 
     func pauseHikeTracking() {
         guard hikeRecorder.isActive, !hikeRecorder.isPaused else { return }
         hikeRecorder.pause()
+        #if os(iOS)
+        updateTrackingLiveActivity(immediately: true)
+        #endif
     }
 
     func resumeHikeTracking() {
         guard hikeRecorder.isPaused else { return }
         hikeRecorder.resume()
+        #if os(iOS)
+        updateTrackingLiveActivity(immediately: true)
+        #endif
     }
 
     func addTrackingSplit() {
@@ -984,10 +1005,16 @@ final class AppState: ObservableObject {
 
     func endRouteTracking() {
         guard hikeRecorder.isActive else {
+            #if os(iOS)
+            trackingLiveActivity.end(finalState: nil)
+            #endif
             isTracking = false
             distanceFromRouteMeters = nil
             return
         }
+        #if os(iOS)
+        let liveActivityFinalState = trackingLiveActivityState()
+        #endif
         let recordedPlan: RoutePlan
         if hikeRecorder.mode == .freeRecording {
             if let lastIndex = routePoints.indices.last,
@@ -1007,6 +1034,9 @@ final class AppState: ObservableObject {
         location.endHikeTracking()
         isTracking = false
         distanceFromRouteMeters = nil
+        #if os(iOS)
+        trackingLiveActivity.end(finalState: liveActivityFinalState)
+        #endif
     }
 
     func saveCompletedHike() {
@@ -1020,10 +1050,16 @@ final class AppState: ObservableObject {
     }
 
     func cancelActiveHike() {
+        #if os(iOS)
+        let liveActivityFinalState = trackingLiveActivityState()
+        #endif
         hikeRecorder.cancel()
         location.endHikeTracking()
         isTracking = false
         distanceFromRouteMeters = nil
+        #if os(iOS)
+        trackingLiveActivity.end(finalState: liveActivityFinalState)
+        #endif
     }
 
     func clearActiveRoute() {
@@ -1338,6 +1374,69 @@ final class AppState: ObservableObject {
         routes.save(currentRoutePlan())
     }
 
+    #if os(iOS)
+    private func startTrackingLiveActivity() {
+        guard let mode = hikeRecorder.mode,
+              let startedAt = hikeRecorder.startedAt else { return }
+        let attributes = AtlasTrackingAttributes(
+            hikeID: hikeRecorder.id,
+            routeName: String(currentRouteName.prefix(80)),
+            mode: mode == .plannedRoute ? .plannedRoute : .freeRecording,
+            startedAt: startedAt
+        )
+        trackingLiveActivity.start(
+            attributes: attributes,
+            state: trackingLiveActivityState()
+        )
+    }
+
+    private func updateTrackingLiveActivity(immediately: Bool = false) {
+        guard hikeRecorder.isActive else { return }
+        trackingLiveActivity.update(
+            trackingLiveActivityState(),
+            immediately: immediately
+        )
+    }
+
+    private func trackingLiveActivityState() -> AtlasTrackingAttributes.ContentState {
+        AtlasTrackingAttributes.ContentState(
+            phase: hikeRecorder.isPaused ? .paused : .recording,
+            usesMetricUnits: unitSystem == .metric,
+            progress: hikeRecorder.mode == .plannedRoute ? routeProgress : 1,
+            distanceMeters: trackingDistanceMeters,
+            remainingMeters: trackingRemainingMeters,
+            nextWaypointName: trackingNextWaypointName.map { String($0.prefix(60)) },
+            nextWaypointRemainingMeters: trackingNextWaypointRemainingMeters,
+            paceSecondsPerMile: trackingPaceSecondsPerMile,
+            eta: trackingETA,
+            elevationMeters: hikeRecorder.samples.last?.altitudeMeters ?? currentRouteElevationMeters,
+            elevationGainMeters: trackingElevationGainMeters,
+            distanceFromRouteMeters: distanceFromRouteMeters,
+            activeDuration: trackingActiveDuration,
+            elevationProfileMeters: liveActivityElevationProfile(),
+            updatedAt: .now
+        )
+    }
+
+    private func liveActivityElevationProfile(maximumCount: Int = 28) -> [Double] {
+        let values: [Double]
+        if hikeRecorder.mode == .plannedRoute, !routeElevationProfile.isEmpty {
+            values = routeElevationProfile
+        } else {
+            values = hikeRecorder.samples.map(\.altitudeMeters)
+        }
+        guard values.count > maximumCount else { return values }
+        return (0..<maximumCount).map { index in
+            let progress = Double(index) / Double(maximumCount - 1)
+            let sourceIndex = min(
+                values.count - 1,
+                Int((progress * Double(values.count - 1)).rounded())
+            )
+            return values[sourceIndex]
+        }
+    }
+    #endif
+
     private func scheduleElevationRefresh(delayNanoseconds: UInt64) {
         elevationTask?.cancel()
         guard hasActiveRoute else {
@@ -1362,6 +1461,9 @@ final class AppState: ObservableObject {
                 self.isLoadingElevationProfile = false
                 self.elevationProfileError = nil
                 self.annotationRevision = UUID()
+                #if os(iOS)
+                if self.isTracking { self.updateTrackingLiveActivity(immediately: true) }
+                #endif
                 if self.routes.routes.contains(where: { $0.id == self.currentRouteID }) {
                     self.routes.save(self.currentRoutePlan())
                 }
